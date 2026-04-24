@@ -839,37 +839,26 @@ if not st.session_state.user_id:
         """, unsafe_allow_html=True)
 
         st.markdown('<div class="login-btn-wrap">', unsafe_allow_html=True)
-        if st.button("🔑  Continue with Google", type="primary", use_container_width=True):
-            # FIX: sign out from Supabase first to force Google re-auth
-            try:
-                supabase_client().auth.sign_out()
-            except Exception:
-                pass
-            st.session_state.logged_out = False
-            res = supabase_client().auth.sign_in_with_oauth({
-                "provider": "google",
-                "options": {
-                    "redirect_to": APP_URL,
-                    "scopes": "email profile",
-                    "query_params": {"prompt": "select_account"}  # forces Google account picker
-                }
-            })
-            st.markdown(f'<meta http-equiv="refresh" content="0; url={res.url}">', unsafe_allow_html=True)
-            st.markdown(f'<script>window.location.replace("{res.url}");</script>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-
-        st.markdown("""
-        <div class="login-card-bottom">
-            <div class="feature-row">
-                <div class="feature-chip"><div class="ficon">📄</div>PDF-powered</div>
-                <div class="feature-chip"><div class="ficon">⚡</div>Instant answers</div>
-                <div class="feature-chip"><div class="ficon">🔒</div>@techwish.com only</div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    st.stop()
-
+        if st.button("🔑 Continue with Google", type="primary", use_container_width=True):
+    # This generates the URL specifically for your Supabase project
+    res = supabase_client().auth.sign_in_with_oauth({
+        "provider": "google",
+        "options": {
+            "redirect_to": APP_URL,  # https://docquey-techwish.streamlit.app
+            "scopes": "email profile",
+            "query_params": {"prompt": "select_account"}
+        }
+    })
+    
+    if res.url:
+        # DO NOT use st.markdown redirect or meta-refresh. 
+        # This JS is the only way to avoid 403s on Streamlit Cloud:
+        st.components.v1.html(f"""
+            <script>
+                window.top.location.href = "{res.url}";
+            </script>
+        """, height=0)
+        st.stop()
 # ─────────────────────────────────────────────────────────────────
 #  2. BUILD INDEX
 # ─────────────────────────────────────────────────────────────────
