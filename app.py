@@ -90,7 +90,7 @@ SNOWFLAKE_SCHEMA    = cfg("SNOWFLAKE_SCHEMA",     "PUBLIC")
 SUPABASE_URL      = cfg("SUPABASE_URL")
 SUPABASE_ANON_KEY = cfg("SUPABASE_ANON_KEY")
 GROQ_API_KEY      = cfg("GROQ_API_KEY")
-APP_URL           = cfg("APP_URL", "http://10.10.31.110:8501")
+APP_URL = cfg("APP_URL", "https://docquey-techwish.streamlit.app")
 ALLOWED_DOMAIN    = cfg("ALLOWED_DOMAIN", "techwish.com")
 
 # ─────────────────────────────────────────────────────────────────
@@ -844,7 +844,42 @@ for k, v in {
 }.items():
     if k not in st.session_state:
         st.session_state[k] = v
+# ─────────────────────────────────────────────────────────────────
+#  AUTHENTICATION & REDIRECTION HANDLER (PLACE AFTER SESSION INIT)
+# ─────────────────────────────────────────────────────────────────
 
+# A. Handle the return from Google (Callback)
+if "code" in st.query_params and not st.session_state.user_id and not st.session_state.logged_out:
+    try:
+        sess = supabase_client().auth.exchange_code_for_session({"auth_code": st.query_params["code"]})
+        user = sess.user
+        if ALLOWED_DOMAIN and not user.email.endswith(f"@{ALLOWED_DOMAIN}"):
+            st.error(f"Access restricted to @{ALLOWED_DOMAIN} accounts.")
+            st.stop()
+        
+        st.session_state.user_id = user.id
+        st.session_state.user_email = user.email
+        st.session_state.user_name = user.user_metadata.get("full_name", user.email.split("@")[0])
+        st.session_state.logged_out = False
+        db_upsert_user(user.id, user.email, st.session_state.user_name)
+        
+        st.query_params.clear()
+        st.rerun()
+    except Exception as e:
+        st.query_params.clear()
+        st.error(f"Auth error: {e}")
+
+# B. Handle the breakout to Google (The Redirect)
+if "redirect_url" in st.session_state and st.session_state.redirect_url:
+    url = st.session_state.redirect_url
+    st.session_state.redirect_url = None 
+    # Using st.components for a cleaner breakout
+    st.components.v1.html(f"""
+        <script>
+            window.top.location.href = "{url}";
+        </script>
+    """, height=0)
+    st.stop()
 # ─────────────────────────────────────────────────────────────────
 #  OAUTH CALLBACK — only process if not logged out
 # ─────────────────────────────────────────────────────────────────
@@ -895,19 +930,29 @@ if not st.session_state.user_id:
 
     _, col, _ = st.columns([1, 1.2, 1])
     with col:
-        st.markdown("""
-        <div class="login-card-html">
-            <div class="login-badge">🔐 &nbsp;Secure Workspace</div>
-            <div class="login-title">Your Intelligent<br>Knowledge Hub</div>
-            <div class="login-sub">
-                Ask anything. Get instant, precise answers<br>
-                drawn directly from your organization's documents.
-            </div>
-            <div class="login-divider-line"></div>
-        </div>
-        """, unsafe_allow_html=True)
+        # Inside Section 1 (Login Page) where the button sits:
+st.markdown('<div class="login-btn-wrap">', unsafe_allow_html=True)
 
-        st.markdown('<div class="login-btn-wrap">', unsafe_allow_html=True)
+if st.button("🔑 Continue with Google", type="primary", use_container_width=True, key="google_login_btn"):
+    try:
+        supabase_client().auth.sign_out()
+    except:
+        pass
+        
+    res = supabase_client().auth.sign_in_with_oauth({
+        "provider": "google",
+        "options": {
+            "redirect_to": APP_URL, 
+            "scopes": "email profile",
+            "query_params": {"prompt": "select_account"}
+        }
+    })
+    
+    if res.url:
+        st.session_state.redirect_url = res.url
+        st.rerun()
+
+st.markdown('</div>', unsafe_allow_html=True)
         
         # USE A UNIQUE KEY to prevent the DuplicateElementId error
         if st.button("🔑 Continue with Google", type="primary", use_container_width=True, key="google_login_btn"):
