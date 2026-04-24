@@ -9,6 +9,25 @@ import numpy as np
 from supabase import create_client
 import snowflake.connector
 # --- ADD THIS AT THE VERY TOP OF YOUR APP (Just below imports) ---
+# ... other imports
+
+# --- HANDLE THE RETURN FROM GOOGLE (MUST BE FIRST) ---
+# When Google sends you back, the URL has ?code=...
+if "code" in st.query_params:
+    try:
+        # 1. Swap code for session
+        res = supabase_client().auth.exchange_code_for_session({
+            "auth_code": st.query_params["code"]
+        })
+        # 2. Store session info
+        st.session_state.user_id = res.user.id
+        st.session_state.user_email = res.user.email
+        # 3. Wipe the 'code' from the address bar to prevent 404s/loops
+        st.query_params.clear()
+        st.rerun()
+    except Exception as e:
+        st.query_params.clear()
+        st.error(f"Login failed: {e}")
 # --- THE NEW REDIRECT BREAKOUT ---
 if "redirect_url" in st.session_state and st.session_state.redirect_url:
     url = st.session_state.redirect_url
