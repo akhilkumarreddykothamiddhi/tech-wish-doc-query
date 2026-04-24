@@ -9,15 +9,15 @@ import numpy as np
 from supabase import create_client
 import snowflake.connector
 
-# ─────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------
 #  TECHWISH BRANDING & ASSETS
-# ─────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------
 LOGO_PATH    = "Techwish-Logo-white (3).png"
 COMPANY_NAME = "Techwish AI"
 
-# ─────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------
 #  CONFIGURATION
-# ─────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------
 def cfg(key: str, default: str = "") -> str:
     try:
         return st.secrets[key]
@@ -36,7 +36,7 @@ SUPABASE_ANON_KEY = cfg("SUPABASE_ANON_KEY")
 GROQ_API_KEY      = cfg("GROQ_API_KEY")
 ALLOWED_DOMAIN    = cfg("ALLOWED_DOMAIN", "techwish.com")
 
-# ── Auto-detect the correct redirect URL ──────────────────────────
+# -- Auto-detect the correct redirect URL --------------------------
 # On Streamlit Cloud, STREAMLIT_SERVER_ADDRESS is not set but we can
 # detect it from the request headers. We fall back to APP_URL secret,
 # then localhost for local dev.
@@ -70,9 +70,9 @@ TOP_K         = 4
 
 NO_CONTEXT_MSG = "I'm sorry, I don't have information about that in the available documents."
 
-# ─────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------
 #  SMALL TALK DETECTION
-# ─────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------
 SMALL_TALK_KEYWORDS = [
     "hi","hello","hey","hru","how are you","how r u","good morning",
     "good afternoon","good evening","good night","what's up","whats up",
@@ -94,15 +94,15 @@ def is_small_talk(text: str) -> bool:
                 return True
     return False
 
-SMALL_TALK_SYSTEM = """You are the Techwish AI Knowledge Assistant — a friendly, professional AI assistant for Techwish employees.
+SMALL_TALK_SYSTEM = """You are the Techwish AI Knowledge Assistant - a friendly, professional AI assistant for Techwish employees.
 You are currently handling a casual greeting or small talk message (NOT a document question).
 Respond warmly, briefly, and professionally. Introduce yourself as the Techwish AI Knowledge Assistant when relevant.
 Mention that you can answer questions about company documents, policies, and more.
-Keep your reply concise — 1 to 3 sentences max."""
+Keep your reply concise - 1 to 3 sentences max."""
 
-# ─────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------
 #  PAGE CONFIG
-# ─────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------
 st.set_page_config(
     page_title=COMPANY_NAME,
     page_icon="🧠",
@@ -110,9 +110,9 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ─────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------
 #  LOGO HELPER
-# ─────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------
 def logo_b64(path: str) -> str:
     p = Path(path)
     if not p.exists():
@@ -121,579 +121,19 @@ def logo_b64(path: str) -> str:
         data = base64.b64encode(f.read()).decode("utf-8")
     return f"data:image/png;base64,{data}"
 
-# ─────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------
 #  GLOBAL CSS
-# ─────────────────────────────────────────────────────────────────
-st.markdown("""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&display=swap');
+# -- GLOBAL CSS/JS loaded from file to avoid tokenizer issues --
+def _load_styles():
+    _p = Path(__file__).parent / 'styles.html'
+    if _p.exists():
+        return _p.read_text(encoding='utf-8')
+    return ''
+st.markdown(_load_styles(), unsafe_allow_html=True)
 
-/* ── RESET / BASE ───────────────────────────────────────────── */
-html, body, [class*="css"] {
-    font-family: 'Sora', sans-serif !important;
-    background: #08090f !important;
-    color: #e8eaf0 !important;
-}
-:root {
-    --bg: #08090f; --bg2: #0e1018; --bg3: #13161f;
-    --border: rgba(255,255,255,0.07); --border2: rgba(255,255,255,0.12);
-    --accent: #6366f1; --text: #e8eaf0;
-    --text2: rgba(232,234,240,0.55); --text3: rgba(232,234,240,0.28);
-    --green: #22c55e; --red: #ef4444;
-    --topnav-h: 52px;
-}
-#MainMenu, footer, .stDeployButton { display: none !important; visibility: hidden !important; }
-
-/* ── Hide Streamlit header completely ────────────────────────── */
-header[data-testid="stHeader"] {
-    display: none !important; height: 0 !important;
-    min-height: 0 !important; overflow: hidden !important;
-}
-
-/* ── Hide the sidebar collapse/expand toggle entirely ────────── */
-[data-testid="collapsedControl"],
-[data-testid="stSidebarToggleButton"],
-[data-testid="stSidebarCollapseButton"],
-button[data-testid="baseButton-headerNoPadding"] {
-    display: none !important;
-    visibility: hidden !important;
-    pointer-events: none !important;
-}
-
-/* ── REMOVE ALL SCROLLBARS from main page ── */
-html, body {
-    height: 100vh !important;
-    overflow: hidden !important;
-    scrollbar-width: none !important;
-}
-html::-webkit-scrollbar,
-body::-webkit-scrollbar,
-[data-testid="stApp"]::-webkit-scrollbar,
-[data-testid="stMain"]::-webkit-scrollbar,
-.main::-webkit-scrollbar {
-    display: none !important;
-    width: 0 !important;
-}
-[data-testid="stApp"],
-[data-testid="stMain"],
-.main {
-    overflow: hidden !important;
-    scrollbar-width: none !important;
-}
-
-/* Main content area — push right of sidebar, below fixed topnav */
-section[data-testid="stMain"] {
-    margin-left: 248px !important;
-    height: 100vh !important;
-    display: flex !important;
-    flex-direction: column !important;
-    overflow: hidden !important;
-    padding-top: var(--topnav-h) !important;
-}
-section[data-testid="stMain"] > div {
-    flex: 1 !important;
-    display: flex !important;
-    flex-direction: column !important;
-    overflow: hidden !important;
-    padding: 0 !important;
-    height: 100% !important;
-}
-.main .block-container {
-    padding: 0 !important;
-    max-width: 100% !important;
-    height: 100% !important;
-    display: flex !important;
-    flex-direction: column !important;
-    overflow: hidden !important;
-}
-
-/* ════════════════════════════════════════════════════════════
-   CHAT SCROLL AREA — only the messages scroll
-   ═══════════════════════════════════════════════════════════ */
-[data-testid="stChatMessageContainer"],
-[data-testid="stVerticalBlock"] {
-    flex: 1 !important;
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
-    scroll-behavior: smooth !important;
-    scrollbar-width: thin !important;
-    scrollbar-color: rgba(255,255,255,0.1) transparent !important;
-}
-[data-testid="stVerticalBlock"]::-webkit-scrollbar { width: 4px; }
-[data-testid="stVerticalBlock"]::-webkit-scrollbar-thumb {
-    background: rgba(255,255,255,0.1); border-radius: 2px;
-}
-
-/* ════════════════════════════════════════════════════════════
-   SIDEBAR — permanently fixed, NO scroll, NO collapse
-   ═══════════════════════════════════════════════════════════ */
-section[data-testid="stSidebar"] {
-    background: #0e1018 !important;
-    border-right: 1px solid rgba(255,255,255,0.07) !important;
-    min-width: 248px !important; max-width: 248px !important;
-    width: 248px !important;
-    overflow: hidden !important;
-    height: 100vh !important;
-    position: fixed !important;
-    top: 0 !important; left: 0 !important;
-    z-index: 200 !important;
-    flex-shrink: 0 !important;
-    scrollbar-width: none !important;
-}
-section[data-testid="stSidebar"]::-webkit-scrollbar { display: none !important; width: 0 !important; }
-section[data-testid="stSidebar"] > div {
-    padding: 0 !important; background: #0e1018 !important;
-    height: 100vh !important; overflow: hidden !important;
-    scrollbar-width: none !important;
-}
-section[data-testid="stSidebar"] > div::-webkit-scrollbar { display: none !important; }
-
-/* Inner scrollable zone for history items only */
-.sb-history-scroll {
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
-    max-height: calc(100vh - 280px);
-    padding: 0 0.85rem;
-    scrollbar-width: none !important;
-}
-.sb-history-scroll::-webkit-scrollbar { display: none !important; }
-
-/* Padding so history list doesn't hide under the pinned sign-out button */
-section[data-testid="stSidebar"] .stVerticalBlock {
-    padding-bottom: 70px !important;
-}
-
-/* All sidebar buttons */
-section[data-testid="stSidebar"] div[data-testid="stButton"] > button {
-    background: rgba(255,255,255,0.03) !important;
-    border: 1px solid rgba(255,255,255,0.07) !important;
-    color: rgba(232,234,240,0.6) !important;
-    border-radius: 9px !important; font-size: 0.78rem !important;
-    padding: 0.45rem 0.75rem !important;
-    transition: all 0.14s ease !important;
-    box-shadow: none !important; width: 100% !important;
-    font-family: 'Sora', sans-serif !important;
-}
-section[data-testid="stSidebar"] div[data-testid="stButton"] > button:hover {
-    background: rgba(99,102,241,0.1) !important;
-    border-color: rgba(99,102,241,0.28) !important; color: white !important;
-}
-.new-chat-btn div[data-testid="stButton"] > button {
-    background: rgba(99,102,241,0.1) !important;
-    border: 1px solid rgba(99,102,241,0.22) !important;
-    color: #a5b4fc !important; font-weight: 700 !important;
-}
-.new-chat-btn div[data-testid="stButton"] > button:hover {
-    background: rgba(99,102,241,0.22) !important;
-    border-color: rgba(99,102,241,0.45) !important; color: white !important;
-}
-section[data-testid="stSidebar"] h3 {
-    font-size: 0.58rem !important; text-transform: uppercase !important;
-    letter-spacing: 0.13em !important; color: rgba(232,234,240,0.25) !important;
-    margin: 0 0 0.4rem !important; font-weight: 700 !important; padding: 0 !important;
-}
-
-/* ════════════════════════════════════════════════════════════
-   SIDEBAR LOGO BLOCK — aligned with topnav height (52px)
-   ═══════════════════════════════════════════════════════════ */
-.sb-logo-block {
-    height: 52px;
-    padding: 0 1rem;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    justify-content: center;
-    gap: 2px;
-}
-.sb-logo-block img { max-width: 110px !important; height: auto !important; display: block; }
-.sb-logo-caption {
-    font-size: 0.58rem;
-    font-weight: 600;
-    color: rgba(165, 180, 252, 0.65);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    padding-left: 1px;
-    margin-top: 1px;
-    line-height: 1;
-}
-.sb-logo-text { font-size: 0.82rem; font-weight: 700; color: white; }
-.sb-logo-sub  { font-size: 0.6rem; color: rgba(232,234,240,0.28); margin-top: 1px; }
-
-/* User pill */
-.user-pill {
-    background: rgba(99,102,241,0.06); border: 1px solid rgba(99,102,241,0.15);
-    border-radius: 11px; padding: 9px 11px;
-    margin: 0.8rem 0.85rem 0;
-    display: flex; align-items: center; gap: 9px;
-}
-.user-av {
-    width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
-    background: linear-gradient(135deg,#6366f1,#ec4899);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 0.68rem; font-weight: 700; color: white;
-}
-.user-av-name { font-size: 0.76rem; font-weight: 600; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-/* ════════════════════════════════════════════════════════════
-   TOP NAV — FIXED, always on top, full width minus sidebar
-   ═══════════════════════════════════════════════════════════ */
-.topnav {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 1.4rem;
-    height: var(--topnav-h);
-    background: rgba(8, 9, 15, 0.98);
-    border-bottom: 1px solid rgba(255,255,255,0.07);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    position: fixed;
-    top: 0;
-    left: 248px;
-    right: 0;
-    z-index: 999;
-}
-.topnav-brand {
-    font-size: 0.84rem;
-    font-weight: 600;
-    color: rgba(232,234,240,0.6);
-    letter-spacing: 0.01em;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-.topnav-brand-icon { font-size: 1rem; }
-.topnav-brand span {
-    background: linear-gradient(90deg, #a5b4fc, #ec4899);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    font-weight: 700;
-}
-.topnav-right {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-}
-.status-pill { display: flex; align-items: center; gap: 6px; }
-.status-dot {
-    width: 7px; height: 7px; border-radius: 50%;
-    background: #22c55e; flex-shrink: 0;
-    animation: pulse-green 2s ease-in-out infinite;
-}
-@keyframes pulse-green {
-    0%,100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.4); }
-    50%      { box-shadow: 0 0 0 4px rgba(34,197,94,0.1); }
-}
-.topnav-email { font-size: 0.72rem; font-weight: 500; color: rgba(232,234,240,0.6); }
-
-/* ════════════════════════════════════════════════════════════
-   AVATAR BUTTON + DROPDOWN — top right corner
-   ═══════════════════════════════════════════════════════════ */
-.avatar-wrap { position: relative; }
-.avatar-circle {
-    width: 34px; height: 34px; border-radius: 50%; cursor: pointer;
-    background: linear-gradient(135deg,#6366f1,#ec4899);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 0.65rem; font-weight: 700; color: white;
-    border: 2px solid rgba(255,255,255,0.15);
-    transition: transform .15s, box-shadow .15s;
-    font-family: 'Sora', sans-serif; flex-shrink: 0;
-    outline: none;
-    user-select: none;
-}
-.avatar-circle:hover {
-    transform: scale(1.08);
-    box-shadow: 0 0 0 3px rgba(99,102,241,0.35);
-    border-color: rgba(165,180,252,0.5);
-}
-.avatar-circle:focus { outline: none; }
-
-/* Avatar dropdown — fixed, top-right corner */
-.avatar-dropdown {
-    display: none;
-    position: fixed;
-    top: 58px;
-    right: 14px;
-    background: #0e1018;
-    border: 1px solid rgba(255,255,255,0.13);
-    border-radius: 16px;
-    padding: 6px;
-    min-width: 210px;
-    box-shadow: 0 24px 60px rgba(0,0,0,0.8), 0 0 0 1px rgba(99,102,241,0.1);
-    z-index: 10000;
-    animation: dropdown-in 0.15s ease;
-}
-@keyframes dropdown-in {
-    from { opacity: 0; transform: translateY(-6px) scale(0.97); }
-    to   { opacity: 1; transform: translateY(0) scale(1); }
-}
-.avatar-dropdown.open { display: block; }
-
-.dd-header {
-    padding: 10px 13px 8px;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
-    margin-bottom: 4px;
-}
-.dd-user-name  { font-size: 0.8rem; font-weight: 700; color: #e8eaf0; margin-bottom: 2px; }
-.dd-user-email { font-size: 0.66rem; color: rgba(232,234,240,0.35); }
-.dd-sep { height: 1px; background: rgba(255,255,255,0.07); margin: 4px 0; }
-.dd-section-label {
-    font-size: 0.58rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
-    color: rgba(232,234,240,0.28); padding: 6px 13px 4px;
-}
-.theme-swatches { display: flex; gap: 10px; padding: 4px 13px 10px; align-items: center; }
-.theme-swatch {
-    width: 26px; height: 26px; border-radius: 50%; cursor: pointer;
-    border: 2px solid transparent; transition: border-color .15s, transform .12s;
-    flex-shrink: 0; position: relative;
-}
-.theme-swatch:hover { transform: scale(1.12); }
-.theme-swatch.active { border-color: rgba(255,255,255,0.7); }
-.theme-swatch-label {
-    font-size: 0.6rem; color: rgba(232,234,240,0.35); text-align: center; margin-top: 2px;
-}
-.theme-option {
-    display: flex; flex-direction: column; align-items: center; cursor: pointer; gap: 3px;
-}
-.theme-option:hover .theme-swatch-label { color: rgba(232,234,240,0.7); }
-.dd-item {
-    display: flex; align-items: center; gap: 9px;
-    padding: 9px 13px; border-radius: 10px;
-    font-size: 0.76rem; color: rgba(232,234,240,0.6);
-    cursor: pointer; transition: background .12s, color .12s;
-    margin: 1px 0;
-}
-.dd-item:hover { background: rgba(255,255,255,0.05); color: #e8eaf0; }
-.dd-item-icon { font-size: 0.9rem; line-height: 1; }
-.dd-item.danger { color: rgba(248,113,113,0.8); }
-.dd-item.danger:hover { background: rgba(239,68,68,0.1); color: #fca5a5; }
-
-/* ════════════════════════════════════════════════════════════
-   WELCOME SCREEN — hidden as soon as any chat message exists
-   ═══════════════════════════════════════════════════════════ */
-.welcome-outer {
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    height: calc(100vh - var(--topnav-h) - 80px);
-    text-align: center; padding: 2rem;
-    overflow: hidden;
-}
-/* Hide welcome screen when any chat message is present */
-[data-testid="stChatMessage"] ~ .welcome-outer,
-[data-testid="stChatMessage"] + .welcome-outer,
-.chat-active .welcome-outer { display: none !important; }
-
-.welcome-orb {
-    width: 62px; height: 62px; border-radius: 18px; margin: 0 auto 1.1rem;
-    background: linear-gradient(135deg,#6366f1 0%,#8b5cf6 50%,#ec4899 100%);
-    display: flex; align-items: center; justify-content: center; font-size: 1.7rem;
-    box-shadow: 0 12px 36px rgba(99,102,241,0.35);
-    animation: orb-glow 3s ease-in-out infinite;
-}
-@keyframes orb-glow {
-    0%,100% { box-shadow: 0 12px 36px rgba(99,102,241,0.35); }
-    50%      { box-shadow: 0 20px 56px rgba(139,92,246,0.55); }
-}
-.welcome-title {
-    font-size: 1.75rem; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 0.5rem;
-    background: linear-gradient(135deg,#fff 0%,#a5b4fc 55%,#ec4899 100%);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent; line-height: 1.2;
-}
-.welcome-sub {
-    font-size: 0.84rem; color: rgba(232,234,240,0.38); line-height: 1.7;
-    margin-bottom: 1.8rem; max-width: 400px;
-}
-.starter-grid {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
-    max-width: 520px; width: 100%; margin: 0 auto;
-}
-.starter-card {
-    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07);
-    border-radius: 13px; padding: 14px 16px; text-align: left; cursor: pointer;
-    transition: all 0.18s;
-}
-.starter-card:hover {
-    background: rgba(99,102,241,0.08); border-color: rgba(99,102,241,0.22);
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(99,102,241,0.12);
-}
-.starter-icon { font-size: 1rem; margin-bottom: 6px; }
-.starter-text { font-size: 0.73rem; color: rgba(232,234,240,0.45); line-height: 1.5; }
-
-/* ════════════════════════════════════════════════════════════
-   CHAT MESSAGES
-   ═══════════════════════════════════════════════════════════ */
-[data-testid="stChatMessage"] {
-    background: transparent !important; border: none !important;
-    padding: 0.4rem 2rem !important; max-width: 840px !important; margin: 0 auto !important;
-}
-[data-testid="stChatMessageContent"] {
-    border-radius: 16px !important; font-size: 0.86rem !important; line-height: 1.7 !important;
-}
-[data-testid="chatAvatarIcon-user"]      { background: linear-gradient(135deg,#6366f1,#8b5cf6) !important; color: white !important; }
-[data-testid="chatAvatarIcon-assistant"] { background: linear-gradient(135deg,#0ea5e9,#6366f1) !important; color: white !important; }
-
-/* History detail cards */
-.hist-session-header {
-    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07);
-    border-radius: 12px; padding: 12px 16px; margin-bottom: 8px;
-    display: flex; align-items: center; justify-content: space-between;
-}
-.hsh-title { font-size: 0.84rem; font-weight: 600; color: #e8eaf0; }
-.hsh-meta  { font-size: 0.65rem; color: rgba(232,234,240,0.3); }
-.hist-msg-card {
-    background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 11px; padding: 10px 14px; margin-bottom: 8px;
-}
-.hist-role {
-    font-size: 0.58rem; font-weight: 700; letter-spacing: 0.1em;
-    text-transform: uppercase; color: rgba(232,234,240,0.28); margin-bottom: 5px;
-}
-.hist-body { font-size: 0.8rem; color: rgba(232,234,240,0.72); line-height: 1.7; }
-
-/* ════════════════════════════════════════════════════════════
-   CHAT INPUT — pinned at the bottom
-   ═══════════════════════════════════════════════════════════ */
-[data-testid="stChatInput"] {
-    background: rgba(255,255,255,0.04) !important;
-    border: 1px solid rgba(255,255,255,0.1) !important;
-    border-radius: 16px !important; backdrop-filter: blur(10px) !important;
-    max-width: 840px !important; margin: 0 auto !important;
-}
-[data-testid="stChatInput"]:focus-within {
-    border-color: rgba(99,102,241,0.45) !important;
-    box-shadow: 0 0 0 3px rgba(99,102,241,0.09) !important;
-}
-[data-testid="stChatInput"] textarea {
-    color: white !important; font-family: 'Sora', sans-serif !important; font-size: 0.84rem !important;
-}
-[data-testid="stChatInput"] textarea::placeholder { color: rgba(232,234,240,0.25) !important; }
-
-[data-testid="stBottom"] {
-    background: rgba(8,9,15,0.95) !important;
-    border-top: 1px solid rgba(255,255,255,0.05) !important;
-    padding: 0.75rem 0 1rem !important;
-    backdrop-filter: blur(12px) !important;
-    -webkit-backdrop-filter: blur(12px) !important;
-}
-
-.stSpinner { color: #6366f1 !important; }
-hr { border-color: rgba(255,255,255,0.05) !important; }
-#chat-bottom { height: 1px; }
-
-/* Sign out button in sidebar */
-.signout-btn div[data-testid="stButton"] > button {
-    background: rgba(239,68,68,0.07) !important;
-    border: 1px solid rgba(239,68,68,0.2) !important;
-    color: rgba(252,165,165,0.8) !important;
-    border-radius: 9px !important; font-size: 0.78rem !important;
-    padding: 0.45rem 0.75rem !important;
-    transition: all 0.14s ease !important;
-    width: 100% !important;
-    font-family: 'Sora', sans-serif !important;
-}
-.signout-btn div[data-testid="stButton"] > button:hover {
-    background: rgba(239,68,68,0.16) !important;
-    border-color: rgba(239,68,68,0.45) !important;
-    color: #fca5a5 !important;
-}
-</style>
-
-<script>
-// ══════════════════════════════════════════════════════════════
-//  TECHWISH APP JS
-// ══════════════════════════════════════════════════════════════
-
-var TW_THEMES = {
-    dark:     { bg:'#08090f',  bg2:'#0e1018', text:'#e8eaf0', sidebar:'#0e1018', topnav:'rgba(8,9,15,0.98)' },
-    light:    { bg:'#f0f0ec',  bg2:'#ffffff', text:'#111118', sidebar:'#ffffff', topnav:'rgba(240,240,236,0.98)' },
-    midnight: { bg:'#0d0a1e',  bg2:'#130f2a', text:'#e0d8ff', sidebar:'#100d22', topnav:'rgba(13,10,30,0.98)' }
-};
-
-window.toggleAvatarMenu = function(event) {
-    if (event) { event.preventDefault(); event.stopPropagation(); }
-    var menu = document.getElementById('tw-avatar-menu');
-    if (!menu) return;
-    menu.classList.toggle('open');
-};
-
-window.setTheme = function(name) {
-    var t = TW_THEMES[name];
-    if (!t) return;
-    var r = document.documentElement;
-    r.style.setProperty('--bg',  t.bg);
-    r.style.setProperty('--bg2', t.bg2);
-    r.style.setProperty('--text', t.text);
-    document.querySelectorAll('html,body,[data-testid="stApp"],[data-testid="stMain"]').forEach(function(el) {
-        el.style.setProperty('background', t.bg, 'important');
-        el.style.setProperty('color', t.text, 'important');
-    });
-    document.querySelectorAll('section[data-testid="stSidebar"],section[data-testid="stSidebar"]>div').forEach(function(el) {
-        el.style.setProperty('background', t.sidebar, 'important');
-    });
-    document.querySelectorAll('.topnav').forEach(function(el) { el.style.background = t.topnav; });
-    document.querySelectorAll('.theme-swatch').forEach(function(d) { d.classList.remove('active'); });
-    var active = document.querySelector('.theme-swatch[data-theme="' + name + '"]');
-    if (active) active.classList.add('active');
-    var menu = document.getElementById('tw-avatar-menu');
-    if (menu) menu.classList.add('open');
-};
-
-// Close dropdown on outside click
-document.addEventListener('mousedown', function(e) {
-    var menu = document.getElementById('tw-avatar-menu');
-    var btn  = document.getElementById('tw-avatar-btn');
-    if (!menu || !btn) return;
-    if (!menu.contains(e.target) && !btn.contains(e.target)) {
-        menu.classList.remove('open');
-    }
-}, true);
-
-// Rebind avatar btn after Streamlit rerenders
-(function bindAvatarBtn() {
-    setInterval(function() {
-        var btn = document.getElementById('tw-avatar-btn');
-        if (btn && !btn._twBound) {
-            btn._twBound = true;
-            btn.addEventListener('click', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                var menu = document.getElementById('tw-avatar-menu');
-                if (menu) menu.classList.toggle('open');
-            });
-        }
-        document.querySelectorAll('.theme-option[data-theme-name]').forEach(function(el) {
-            if (!el._twBound) {
-                el._twBound = true;
-                el.addEventListener('click', function() { window.setTheme(el.dataset.themeName); });
-            }
-        });
-
-        // Hide welcome screen as soon as any chat message appears
-        var hasMsgs = document.querySelector('[data-testid="stChatMessage"]');
-        var welcome = document.querySelector('.welcome-outer');
-        if (hasMsgs && welcome) {
-            welcome.style.display = 'none';
-        }
-    }, 300);
-})();
-
-// Auto-scroll chat to bottom
-function twScrollBottom() {
-    var el = document.getElementById('chat-bottom');
-    if (el) el.scrollIntoView({ behavior: 'smooth' });
-    // Also hide welcome if messages exist
-    var hasMsgs = document.querySelector('[data-testid="stChatMessage"]');
-    var welcome = document.querySelector('.welcome-outer');
-    if (hasMsgs && welcome) welcome.style.display = 'none';
-}
-new MutationObserver(twScrollBottom).observe(document.documentElement, { childList: true, subtree: true });
-</script>
-""", unsafe_allow_html=True)
-
-# ─────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------
 #  SNOWFLAKE DATABASE
-# ─────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------
 @st.cache_resource
 def get_db():
     conn = snowflake.connector.connect(
@@ -767,9 +207,9 @@ def db_log_document(filename, uploaded_by, chunk_count):
     _sf_exec("INSERT INTO document_metadata (id,filename,uploaded_by,chunk_count) VALUES (%s,%s,%s,%s)",
         (str(uuid.uuid4()), filename, uploaded_by, chunk_count))
 
-# ─────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------
 #  AI & PDF SEARCH
-# ─────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------
 @st.cache_resource
 def supabase_client():
     return create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
@@ -825,9 +265,9 @@ def ask_groq_smalltalk(prompt):
         temperature=0.7, max_tokens=200)
     return resp.choices[0].message.content
 
-# ─────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------
 #  SESSION INIT
-# ─────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------
 for k, v in {
     "user_id": None, "user_email": None, "user_name": None,
     "chat_sid": None, "chat_msgs": [], "logged_out": False,
@@ -836,9 +276,9 @@ for k, v in {
     if k not in st.session_state:
         st.session_state[k] = v
 
-# ─────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------
 #  OAUTH CALLBACK
-# ─────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------
 if "code" in st.query_params and not st.session_state.user_id and not st.session_state.logged_out:
     try:
         sess = supabase_client().auth.exchange_code_for_session({"auth_code": st.query_params["code"]})
@@ -855,9 +295,9 @@ if "code" in st.query_params and not st.session_state.user_id and not st.session
     except Exception as e:
         st.error(f"Auth error: {e}")
 
-# ─────────────────────────────────────────────────────────────────
-#  LOGIN PAGE  — button is INSIDE the card
-# ─────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------
+#  LOGIN PAGE  - button is INSIDE the card
+# -----------------------------------------------------------------
 if not st.session_state.user_id:
     if "code" in st.query_params and st.session_state.logged_out:
         st.query_params.clear()
@@ -918,7 +358,7 @@ if not st.session_state.user_id:
         text-align: center;
     }
     .fchip .fi { font-size: 1.1rem; margin-bottom: 4px; display: block; }
-    /* Google login button — inside card */
+    /* Google login button - inside card */
     .login-btn-inside div[data-testid="stButton"] > button {
         background: linear-gradient(135deg,#6366f1 0%,#8b5cf6 50%,#ec4899 100%) !important;
         color: white !important; font-family: 'Sora',sans-serif !important;
@@ -936,7 +376,7 @@ if not st.session_state.user_id:
     section[data-testid="stSidebar"] { display: none !important; }
     section[data-testid="stMain"] { margin-left: 0 !important; padding-top: 0 !important; }
     .main .block-container { padding: 0 !important; }
-    /* The Streamlit widget area — place it inside the card visually */
+    /* The Streamlit widget area - place it inside the card visually */
     .login-widget-anchor {
         position: fixed;
         left: 50%;
@@ -993,7 +433,7 @@ if not st.session_state.user_id:
                 "query_params": {"prompt": "select_account", "access_type": "offline"}
             }
         })
-        # Use st.markdown + immediate JS redirect — works on Streamlit Cloud
+        # Use st.markdown + immediate JS redirect - works on Streamlit Cloud
         st.markdown(
             f"""<script>window.top.location.href = "{res.url}";</script>
             <meta http-equiv="refresh" content="0; url={res.url}">""",
@@ -1003,14 +443,14 @@ if not st.session_state.user_id:
     st.markdown('</div></div>', unsafe_allow_html=True)
     st.stop()
 
-# ─────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------
 #  BUILD INDEX
-# ─────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------
 doc_idx, doc_chunks, doc_meta = build_index()
 
-# ─────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------
 #  SIDEBAR
-# ─────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------
 name     = st.session_state.user_name
 email    = st.session_state.user_email
 initials = "".join(w[0].upper() for w in name.split()[:2]) if name else "?"
@@ -1018,7 +458,7 @@ initials = "".join(w[0].upper() for w in name.split()[:2]) if name else "?"
 with st.sidebar:
     b64 = logo_b64(LOGO_PATH)
 
-    # ── Logo block — exactly 52px tall to match topnav ────────────
+    # -- Logo block - exactly 52px tall to match topnav ------------
     if b64:
         st.markdown(f"""
         <div class="sb-logo-block">
@@ -1038,7 +478,7 @@ with st.sidebar:
         </div>
         """, unsafe_allow_html=True)
 
-    # ── User pill ─────────────────────────────────────────────────
+    # -- User pill -------------------------------------------------
     st.markdown(f"""
     <div class="user-pill">
         <div class="user-av">{initials}</div>
@@ -1047,7 +487,7 @@ with st.sidebar:
     """, unsafe_allow_html=True)
     st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
 
-    # ── New Conversation ──────────────────────────────────────────
+    # -- New Conversation ------------------------------------------
     st.markdown('<div class="new-chat-btn" style="padding:0 0.85rem 0.5rem;">', unsafe_allow_html=True)
     if st.button("✦  New Conversation", use_container_width=True):
         st.session_state.chat_sid        = None
@@ -1056,7 +496,7 @@ with st.sidebar:
         st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # ── Chat History ──────────────────────────────────────────────
+    # -- Chat History ----------------------------------------------
     st.markdown("### Chat History")
 
     sessions = db_sessions(st.session_state.user_id)
@@ -1083,7 +523,7 @@ with st.sidebar:
                     st.session_state.viewing_session = None
                 st.rerun()
 
-    # ── Sign Out — pinned at the bottom of the sidebar ───────────
+    # -- Sign Out - pinned at the bottom of the sidebar -----------
     st.markdown("""
     <div style="position:absolute;bottom:0;left:0;right:0;padding:0.75rem 0.85rem 1rem;
                 border-top:1px solid rgba(255,255,255,0.06);background:#0e1018;">
@@ -1094,9 +534,9 @@ with st.sidebar:
         st.rerun()
     st.markdown('</div></div>', unsafe_allow_html=True)
 
-# ─────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------
 #  FIXED TOP NAV
-# ─────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------
 st.markdown(f"""
 <div class="topnav">
     <div class="topnav-brand">
@@ -1141,7 +581,7 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# Handle sign-out (session_state flag — works on Streamlit Cloud, no query param needed)
+# Handle sign-out (session_state flag - works on Streamlit Cloud, no query param needed)
 if st.session_state.get("_do_signout"):
     try: supabase_client().auth.sign_out()
     except: pass
@@ -1154,9 +594,9 @@ if st.session_state.get("_do_signout"):
     st.session_state.chat_msgs  = []
     st.rerun()
 
-# ─────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------
 #  SYSTEM PROMPT
-# ─────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------
 SYSTEM_PROMPT = """You are the Techwish AI Knowledge Assistant.
 You ONLY answer using the Context provided below. This is a strict rule with no exceptions.
 
@@ -1170,21 +610,21 @@ RULES:
 Context:
 {context}"""
 
-# ─────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------
 #  MAIN CHAT AREA
-# ─────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------
 viewing       = st.session_state.get("viewing_session")
 has_chat_msgs = bool(st.session_state.chat_msgs)
 
 if not has_chat_msgs and not viewing:
-    # ── WELCOME ──────────────────────────────────────────────────
+    # -- WELCOME --------------------------------------------------
     st.markdown("""
     <div class="welcome-outer" id="tw-welcome">
         <div class="welcome-orb">🧠</div>
         <div class="welcome-title">How can I help you today?</div>
         <div class="welcome-sub">
             Ask me anything about the documents uploaded to this workspace.<br>
-            I'll give you precise, grounded answers — no hallucinations.
+            I'll give you precise, grounded answers - no hallucinations.
         </div>
         <div class="starter-grid">
             <div class="starter-card">
@@ -1208,7 +648,7 @@ if not has_chat_msgs and not viewing:
     """, unsafe_allow_html=True)
 
 elif viewing and not has_chat_msgs:
-    # ── HISTORY DETAIL VIEW ───────────────────────────────────────
+    # -- HISTORY DETAIL VIEW ---------------------------------------
     hist_msgs = db_messages(viewing)
     s_info    = next((s for s in db_sessions(st.session_state.user_id) if s["id"] == viewing), None)
     title_txt = s_info["title"] if s_info else "Conversation"
@@ -1235,16 +675,16 @@ elif viewing and not has_chat_msgs:
     st.markdown("</div>", unsafe_allow_html=True)
 
 else:
-    # ── LIVE CHAT VIEW ────────────────────────────────────────────
+    # -- LIVE CHAT VIEW --------------------------------------------
     for m in st.session_state.chat_msgs:
         with st.chat_message(m["role"]):
             st.markdown(m["content"])
 
 st.markdown('<div id="chat-bottom"></div>', unsafe_allow_html=True)
 
-# ─────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------
 #  CHAT INPUT
-# ─────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------
 if prompt := st.chat_input("Ask anything about your documents…"):
     # Hide welcome immediately via JS
     st.markdown("""
