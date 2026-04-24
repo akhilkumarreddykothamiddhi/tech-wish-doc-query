@@ -849,7 +849,8 @@ if not st.session_state.user_id:
                 "query_params": {"prompt": "select_account"}
         }
     })
-        if res.url:
+        
+    if res.url:
         # DO NOT use st.markdown redirect or meta-refresh. 
         # This JS is the only way to avoid 403s on Streamlit Cloud:
             st.components.v1.html(f"""
