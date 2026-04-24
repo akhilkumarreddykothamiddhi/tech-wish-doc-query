@@ -853,7 +853,7 @@ if not st.session_state.user_id:
         if res.url:
         # DO NOT use st.markdown redirect or meta-refresh. 
         # This JS is the only way to avoid 403s on Streamlit Cloud:
-        st.components.v1.html(f"""
+            st.components.v1.html(f"""
             <script>
                 window.top.location.href = "{res.url}";
             </script>
