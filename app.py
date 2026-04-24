@@ -836,14 +836,26 @@ if "code" in st.query_params and not st.session_state.user_id and not st.session
         st.error(f"Auth error: {e}")
 
 # ─────────────────────────────────────────────────────────────────
-#  1. LOGIN PAGE (FIXED FOR REDIRECT)
+#  1. LOGIN PAGE (CLEAN & FIXED)
 # ─────────────────────────────────────────────────────────────────
+
+# --- THE REDIRECT BREAKOUT (Must be here to catch the rerun) ---
+if "redirect_url" in st.session_state and st.session_state.redirect_url:
+    url = st.session_state.redirect_url
+    st.session_state.redirect_url = None  # Reset state
+    st.components.v1.html(f"""
+        <script>
+            window.top.location.href = "{url}";
+        </script>
+    """, height=0)
+    st.stop()
+
 if not st.session_state.user_id:
-    # If there's an OAuth code in URL but user already logged out, clear it
+    # Clear OAuth code if user is logged out
     if "code" in st.query_params and st.session_state.logged_out:
         st.query_params.clear()
 
-    # Background Visuals
+    # Visuals
     st.markdown('<div class="login-bg"></div>', unsafe_allow_html=True)
     st.markdown('<div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div>', unsafe_allow_html=True)
 
@@ -852,7 +864,6 @@ if not st.session_state.user_id:
         st.markdown(f'<div class="login-top-bar"><img src="{b64}" height="36" style="display:block;"></div>', unsafe_allow_html=True)
 
     _, col, _ = st.columns([1, 1.2, 1])
-    
     with col:
         st.markdown("""
         <div class="login-card-html">
@@ -868,10 +879,9 @@ if not st.session_state.user_id:
 
         st.markdown('<div class="login-btn-wrap">', unsafe_allow_html=True)
         
-        # --- FIXED LOGIN BUTTON LOGIC ---
-        if st.button("🔑 Continue with Google", type="primary", use_container_width=True):
+        # USE A UNIQUE KEY to prevent the DuplicateElementId error
+        if st.button("🔑 Continue with Google", type="primary", use_container_width=True, key="google_login_btn"):
             try:
-                # Force sign out first to ensure fresh account picker
                 supabase_client().auth.sign_out()
             except:
                 pass
@@ -886,14 +896,9 @@ if not st.session_state.user_id:
             })
             
             if res.url:
-                # Break out of the Streamlit iframe - critical for hosted apps
-                st.components.v1.html(f"""
-                    <script>
-                        window.top.location.href = "{res.url}";
-                    </script>
-                """, height=0)
-                st.stop()
-        
+                st.session_state.redirect_url = res.url
+                st.rerun()
+
         st.markdown('</div>', unsafe_allow_html=True)
 
         st.markdown("""
@@ -905,9 +910,8 @@ if not st.session_state.user_id:
             </div>
         </div>
         """, unsafe_allow_html=True)
-
-    # CRITICAL: Stop execution here so it doesn't try to load the chat UI
-    st.stop()
+    
+    st.stop() # Stop here so the rest of the app doesn't load for guests
 # ─────────────────────────────────────────────────────────────────
 #  2. BUILD INDEX
 # ─────────────────────────────────────────────────────────────────
