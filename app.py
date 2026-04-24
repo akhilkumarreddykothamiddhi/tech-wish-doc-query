@@ -8,7 +8,33 @@ import faiss
 import numpy as np
 from supabase import create_client
 import snowflake.connector
+# --- ADD THIS AT THE VERY TOP OF YOUR APP (Just below imports) ---
+if "redirect_url" in st.session_state and st.session_state.redirect_url:
+    url = st.session_state.redirect_url
+    st.session_state.redirect_url = None  # Clear it
+    st.components.v1.html(f"""
+        <script>
+            window.top.location.href = "{url}";
+        </script>
+    """, height=0)
+    st.stop()
 
+# --- INSIDE YOUR LOGIN PAGE (The button area) ---
+st.markdown('<div class="login-btn-wrap">', unsafe_allow_html=True)
+if st.button("🔑 Continue with Google", type="primary", use_container_width=True):
+    res = supabase_client().auth.sign_in_with_oauth({
+        "provider": "google",
+        "options": {
+            "redirect_to": APP_URL, 
+            "scopes": "email profile",
+            "query_params": {"prompt": "select_account"}
+        }
+    })
+    
+    if res.url:
+        st.session_state.redirect_url = res.url
+        st.rerun()  # This triggers the block at the top of the script
+st.markdown('</div>', unsafe_allow_html=True)
 # ─────────────────────────────────────────────────────────────────
 #  TECHWISH BRANDING & ASSETS
 # ─────────────────────────────────────────────────────────────────
