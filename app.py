@@ -904,10 +904,14 @@ if "code" in st.query_params and not st.session_state.user_id and not st.session
 #  1. LOGIN PAGE (CLEAN & FIXED)
 # ─────────────────────────────────────────────────────────────────
 
-# --- THE REDIRECT BREAKOUT (Must be here to catch the rerun) ---
+# ─────────────────────────────────────────────────────────────────
+#  1. LOGIN PAGE (CLEAN & FIXED)
+# ─────────────────────────────────────────────────────────────────
+
+# --- REDIRECT HANDLER ---
 if "redirect_url" in st.session_state and st.session_state.redirect_url:
     url = st.session_state.redirect_url
-    st.session_state.redirect_url = None  # Reset state
+    st.session_state.redirect_url = None
     st.components.v1.html(f"""
         <script>
             window.top.location.href = "{url}";
@@ -916,66 +920,62 @@ if "redirect_url" in st.session_state and st.session_state.redirect_url:
     st.stop()
 
 if not st.session_state.user_id:
-    # Clear OAuth code if user is logged out
+
+    # Clear OAuth code if user logged out
     if "code" in st.query_params and st.session_state.logged_out:
         st.query_params.clear()
 
-    # Visuals
+    # Background UI
     st.markdown('<div class="login-bg"></div>', unsafe_allow_html=True)
     st.markdown('<div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div>', unsafe_allow_html=True)
 
+    # Logo top bar
     b64 = logo_b64(LOGO_PATH)
     if b64:
-        st.markdown(f'<div class="login-top-bar"><img src="{b64}" height="36" style="display:block;"></div>', unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="login-top-bar"><img src="{b64}" height="36"></div>',
+            unsafe_allow_html=True
+        )
 
+    # Center card
     _, col, _ = st.columns([1, 1.2, 1])
+
     with col:
-        # Inside Section 1 (Login Page) where the button sits:
-st.markdown('<div class="login-btn-wrap">', unsafe_allow_html=True)
+        st.markdown("""
+        <div class="login-card-html">
+            <div class="login-badge">Techwish AI</div>
+            <div class="login-title">Welcome Back</div>
+            <div class="login-sub">
+                Sign in securely using your company Google account
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
-if st.button("🔑 Continue with Google", type="primary", use_container_width=True, key="google_login_btn"):
-    try:
-        supabase_client().auth.sign_out()
-    except:
-        pass
-        
-    res = supabase_client().auth.sign_in_with_oauth({
-        "provider": "google",
-        "options": {
-            "redirect_to": APP_URL, 
-            "scopes": "email profile",
-            "query_params": {"prompt": "select_account"}
-        }
-    })
-    
-    if res.url:
-        st.session_state.redirect_url = res.url
-        st.rerun()
+        # ✅ SINGLE BUTTON ONLY (FIXED)
+        st.markdown('<div class="login-btn-wrap">', unsafe_allow_html=True)
 
-st.markdown('</div>', unsafe_allow_html=True)
-        
-        # USE A UNIQUE KEY to prevent the DuplicateElementId error
-        if st.button("🔑 Continue with Google", type="primary", use_container_width=True, key="google_login_btn"):
+        if st.button("🔑 Continue with Google", use_container_width=True):
             try:
                 supabase_client().auth.sign_out()
             except:
                 pass
-                
+
             res = supabase_client().auth.sign_in_with_oauth({
                 "provider": "google",
                 "options": {
-                    "redirect_to": APP_URL, 
+                    "redirect_to": APP_URL,
                     "scopes": "email profile",
                     "query_params": {"prompt": "select_account"}
                 }
             })
-            
+
             if res.url:
                 st.session_state.redirect_url = res.url
                 st.rerun()
 
         st.markdown('</div>', unsafe_allow_html=True)
 
+        # Bottom features
         st.markdown("""
         <div class="login-card-bottom">
             <div class="feature-row">
@@ -985,8 +985,8 @@ st.markdown('</div>', unsafe_allow_html=True)
             </div>
         </div>
         """, unsafe_allow_html=True)
-    
-    st.stop() # Stop here so the rest of the app doesn't load for guests
+
+    st.stop()
 # ─────────────────────────────────────────────────────────────────
 #  2. BUILD INDEX
 # ─────────────────────────────────────────────────────────────────
