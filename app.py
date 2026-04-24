@@ -850,15 +850,15 @@ if st.button("🔑 Continue with Google", type="primary", use_container_width=Tr
         }
     })
         
-    if res.url:
+if res.url:
         # DO NOT use st.markdown redirect or meta-refresh. 
         # This JS is the only way to avoid 403s on Streamlit Cloud:
-            st.components.v1.html(f"""
-                <script>
-                    window.top.location.href = "{res.url}";
-                </script>
-            """, height=0)
-            st.stop()
+     st.components.v1.html(f"""
+         <script>
+             window.top.location.href = "{res.url}";
+         </script>
+     """, height=0)
+     st.stop()
 # ─────────────────────────────────────────────────────────────────
 #  2. BUILD INDEX
 # ─────────────────────────────────────────────────────────────────
