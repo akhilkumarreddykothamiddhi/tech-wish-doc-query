@@ -9,14 +9,25 @@ import numpy as np
 from supabase import create_client
 import snowflake.connector
 # --- ADD THIS AT THE VERY TOP OF YOUR APP (Just below imports) ---
+# --- THE NEW REDIRECT BREAKOUT ---
 if "redirect_url" in st.session_state and st.session_state.redirect_url:
     url = st.session_state.redirect_url
-    st.session_state.redirect_url = None  # Clear it
-    st.components.v1.html(f"""
+    st.session_state.redirect_url = None  # Reset state
+    
+    # We use a markdown link with a target="_top" breakout
+    # and a meta-refresh as a fallback.
+    st.markdown(f"""
+        <meta http-equiv="refresh" content="0; url={url}">
+        <a id="link" href="{url}" target="_top" style="display:none;">Redirecting...</a>
         <script>
+            // Try different breakout methods
             window.top.location.href = "{url}";
+            document.getElementById('link').click();
         </script>
-    """, height=0)
+    """, unsafe_allow_html=True)
+    
+    # Provide a manual link just in case the browser blocks the auto-redirect
+    st.info(f"Redirecting to Google Secure Login... [Click here if not redirected]({url})")
     st.stop()
 
 # --- INSIDE YOUR LOGIN PAGE (The button area) ---
