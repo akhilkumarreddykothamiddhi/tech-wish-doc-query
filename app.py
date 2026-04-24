@@ -839,9 +839,9 @@ if not st.session_state.user_id:
         """, unsafe_allow_html=True)
 
         st.markdown('<div class="login-btn-wrap">', unsafe_allow_html=True)
-        if st.button("🔑 Continue with Google", type="primary", use_container_width=True):
+if st.button("🔑 Continue with Google", type="primary", use_container_width=True):
     # This generates the URL specifically for your Supabase project
-            res = supabase_client().auth.sign_in_with_oauth({
+     res = supabase_client().auth.sign_in_with_oauth({
                 "provider": "google",
                 "options": {
                 "redirect_to": APP_URL,  # https://docquey-techwish.streamlit.app
@@ -854,11 +854,11 @@ if not st.session_state.user_id:
         # DO NOT use st.markdown redirect or meta-refresh. 
         # This JS is the only way to avoid 403s on Streamlit Cloud:
             st.components.v1.html(f"""
-            <script>
-                window.top.location.href = "{res.url}";
-            </script>
-        """, height=0)
-        st.stop()
+                <script>
+                    window.top.location.href = "{res.url}";
+                </script>
+            """, height=0)
+            st.stop()
 # ─────────────────────────────────────────────────────────────────
 #  2. BUILD INDEX
 # ─────────────────────────────────────────────────────────────────
