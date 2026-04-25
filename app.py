@@ -604,23 +604,35 @@ if not st.session_state.user_id:
                 }
             })
             if res and res.url:
-                # ── KEY FIX: use st.markdown meta-refresh + JS top-frame redirect ──
-                # This breaks out of the Streamlit iframe on Streamlit Cloud.
-                st.markdown(f"""
+                # ── IFRAME BREAKOUT FIX ──────────────────────────────────────
+                # st.markdown scripts are sandboxed and cannot escape the iframe.
+                # st.components.v1.html() renders its OWN iframe which CAN use
+                # window.top to escape Streamlit Cloud's outer iframe.
+                import streamlit.components.v1 as components
+                components.html(f"""
+                    <html>
+                    <body style="margin:0;background:transparent;">
                     <script>
-                        (function() {{
-                            try {{ window.top.location.href = "{res.url}"; }}
-                            catch(e) {{ window.location.href = "{res.url}"; }}
-                        }})();
+                        // Try top-frame breakout first (works on Streamlit Cloud)
+                        try {{
+                            window.top.location.href = "{res.url}";
+                        }} catch(e) {{
+                            // Fallback: open in same window
+                            window.location.href = "{res.url}";
+                        }}
                     </script>
-                    <meta http-equiv="refresh" content="0; url={res.url}">
-                    <p style="color:rgba(255,255,255,0.5);text-align:center;font-size:0.8rem;margin-top:1rem;">
-                        Redirecting to Google…
-                        <a href="{res.url}" target="_top" style="color:#a5b4fc;">Click here if nothing happens</a>
+                    <p style="font-family:sans-serif;font-size:13px;color:#888;text-align:center;padding-top:10px;">
+                        Redirecting to Google login…<br>
+                        <a href="{res.url}" target="_top"
+                           style="color:#a5b4fc;text-decoration:none;font-weight:600;">
+                           ↗ Click here if not redirected automatically
+                        </a>
                     </p>
-                """, unsafe_allow_html=True)
+                    </body>
+                    </html>
+                """, height=60)
             else:
-                st.error("Could not generate login URL. Check Supabase configuration.")
+                st.error("Could not generate login URL. Please check your Supabase configuration.")
         st.markdown('</div>', unsafe_allow_html=True)
 
         st.markdown("""
