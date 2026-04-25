@@ -109,31 +109,46 @@ def supabase_client():
     return create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
 
 # ─────────────────────────────────────────────────────────────────
-#  AUTH — STEP 1: Handle the OAuth callback (code in URL)
-#  This MUST run before any UI is rendered.
+#  AUTH — Handle OAuth callback
+#  Supports BOTH flows:
+#   • implicit flow  → access_token in URL hash, extracted by JS
+#                      and passed back as ?access_token=
+#   • PKCE flow      → ?code= in query params (fallback)
 # ─────────────────────────────────────────────────────────────────
-if "code" in st.query_params and not st.session_state.user_id:
+
+def _handle_auth_user(user):
+    """Shared logic after getting a valid Supabase user."""
+    if ALLOWED_DOMAIN and not user.email.endswith(f"@{ALLOWED_DOMAIN}"):
+        st.query_params.clear()
+        st.error(f"❌ Access restricted to @{ALLOWED_DOMAIN} accounts.")
+        st.stop()
+    st.session_state.user_id    = user.id
+    st.session_state.user_email = user.email
+    st.session_state.user_name  = (
+        user.user_metadata.get("full_name") or user.email.split("@")[0]
+    )
+    st.query_params.clear()
+    st.rerun()
+
+# A) Implicit flow — access_token extracted from URL hash by JS
+if "access_token" in st.query_params and not st.session_state.user_id:
+    try:
+        access_token  = st.query_params["access_token"]
+        refresh_token = st.query_params.get("refresh_token", "")
+        res  = supabase_client().auth.set_session(access_token, refresh_token)
+        _handle_auth_user(res.user)
+    except Exception as e:
+        st.query_params.clear()
+        st.error(f"Authentication failed: {e}. Please try again.")
+        st.stop()
+
+# B) PKCE flow — ?code= in query params
+elif "code" in st.query_params and not st.session_state.user_id:
     try:
         res  = supabase_client().auth.exchange_code_for_session(
             {"auth_code": st.query_params["code"]}
         )
-        user = res.user
-
-        # Domain guard
-        if ALLOWED_DOMAIN and not user.email.endswith(f"@{ALLOWED_DOMAIN}"):
-            st.query_params.clear()
-            st.error(f"❌ Access restricted to @{ALLOWED_DOMAIN} accounts. Please use your company email.")
-            st.stop()
-
-        st.session_state.user_id    = user.id
-        st.session_state.user_email = user.email
-        st.session_state.user_name  = (
-            user.user_metadata.get("full_name") or user.email.split("@")[0]
-        )
-        # Clear the ?code= from the URL so refreshing doesn't re-trigger auth
-        st.query_params.clear()
-        st.rerun()
-
+        _handle_auth_user(res.user)
     except Exception as e:
         st.query_params.clear()
         st.error(f"Authentication failed: {e}. Please try again.")
@@ -601,26 +616,65 @@ if not st.session_state.user_id:
                     "redirect_to": APP_URL,
                     "scopes": "email profile",
                     "query_params": {"prompt": "select_account"},
+                    "flow_type": "implicit",   # ← fixes PKCE code_verifier mismatch
+                    "skip_browser_redirect": True,
                 }
             })
             if res and res.url:
-                # ── KEY FIX: use st.markdown meta-refresh + JS top-frame redirect ──
-                # This breaks out of the Streamlit iframe on Streamlit Cloud.
-                st.markdown(f"""
+                # ── IFRAME BREAKOUT + HASH EXTRACTOR ─────────────────────────
+                # 1. window.top breaks out of Streamlit Cloud's iframe
+                # 2. After Google redirects back, the access_token is in the
+                #    URL hash (#access_token=...). A second JS snippet reads
+                #    the hash and forwards it as ?access_token= so Streamlit
+                #    (which can't read hashes) can process it.
+                import streamlit.components.v1 as components
+                components.html(f"""
+                    <html>
+                    <head>
                     <script>
-                        (function() {{
-                            try {{ window.top.location.href = "{res.url}"; }}
-                            catch(e) {{ window.location.href = "{res.url}"; }}
-                        }})();
+                    // ── Part 1: If we have a hash with access_token,
+                    //    convert it to query params for Streamlit to read
+                    (function() {{
+                        var hash = window.location.hash;
+                        if (hash && hash.indexOf("access_token") !== -1) {{
+                            var params = hash.replace("#", "");
+                            var obj = {{}};
+                            params.split("&").forEach(function(p) {{
+                                var kv = p.split("=");
+                                obj[kv[0]] = decodeURIComponent(kv[1] || "");
+                            }});
+                            // Redirect to app with access_token as query param
+                            var base = window.location.origin + window.location.pathname;
+                            var newUrl = base + "?access_token=" + encodeURIComponent(obj.access_token)
+                                       + "&refresh_token=" + encodeURIComponent(obj.refresh_token || "");
+                            try {{ window.top.location.href = newUrl; }}
+                            catch(e) {{ window.location.href = newUrl; }}
+                            return;
+                        }}
+
+                        // ── Part 2: No hash yet, redirect to Google login
+                        try {{
+                            window.top.location.href = "{res.url}";
+                        }} catch(e) {{
+                            window.location.href = "{res.url}";
+                        }}
+                    }})();
                     </script>
-                    <meta http-equiv="refresh" content="0; url={res.url}">
-                    <p style="color:rgba(255,255,255,0.5);text-align:center;font-size:0.8rem;margin-top:1rem;">
-                        Redirecting to Google…
-                        <a href="{res.url}" target="_top" style="color:#a5b4fc;">Click here if nothing happens</a>
+                    </head>
+                    <body style="margin:0;background:transparent;">
+                    <p style="font-family:sans-serif;font-size:13px;color:#888;
+                               text-align:center;padding-top:10px;">
+                        Redirecting to Google login…<br>
+                        <a href="{res.url}" target="_top"
+                           style="color:#a5b4fc;text-decoration:none;font-weight:600;">
+                           ↗ Click here if not redirected automatically
+                        </a>
                     </p>
-                """, unsafe_allow_html=True)
+                    </body>
+                    </html>
+                """, height=60)
             else:
-                st.error("Could not generate login URL. Check Supabase configuration.")
+                st.error("Could not generate login URL. Please check your Supabase configuration.")
         st.markdown('</div>', unsafe_allow_html=True)
 
         st.markdown("""
