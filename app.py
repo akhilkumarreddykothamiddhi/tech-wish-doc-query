@@ -34,7 +34,7 @@ SNOWFLAKE_DATABASE  = cfg("SNOWFLAKE_DATABASE",   "ORGMIND_AI")
 SNOWFLAKE_SCHEMA    = cfg("SNOWFLAKE_SCHEMA",     "PUBLIC")
 SNOWFLAKE_ROLE      = cfg("SNOWFLAKE_ROLE",       "ACCOUNTADMIN")
 
-GROQ_API_KEY  = cfg("GROQ_API_KEY",  "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")
+GROQ_API_KEY  = cfg("GROQ_API_KEY")
 ALLOWED_DOMAIN = cfg("ALLOWED_DOMAIN", "techwish.com")
 
 # ── Gmail SMTP (fill these in st.secrets or env) ──────────────────
