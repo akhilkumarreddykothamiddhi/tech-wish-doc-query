@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TechWish DocQuery - Login</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,300;0,400;1,300&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --dark: #3a3a3a;
+            --darker: #2e2e2e;
+            --light-bg: #e8e8e8;
+            --card-bg: #ffffff;
+            --accent: #e85d4a;
+            --accent-hover: #d44a37;
+            --text-dark: #2c2c2c;
+            --text-muted: #666;
+            --border: #ddd;
+            --input-focus: rgba(232, 93, 74, 0.15);
+        }
+
+        html, body {
+            height: 100%;
+            font-family: 'DM Sans', sans-serif;
+            background: var(--dark);
+            color: var(--text-dark);
+            overflow-x: hidden;
+        }
+
+        /* ── HERO SECTION ─────────────────────────────────────── */
+        .hero {
+            display: flex;
+            min-height: 100vh;
+            position: relative;
+        }
+
+        /* LEFT DARK PANEL */
+        .hero-left {
+            flex: 1;
+            background: var(--dark);
+            color: white;
+            padding: 50px 70px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            position: relative;
+            z-index: 1;
+        }
+
+        .logo-wrap {
+            position: absolute;
+            top: 32px;
+            left: 40px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .logo-wrap img {
+            height: 36px;
+            display: block;
+            object-fit: contain;
+        }
+
+        .logo-fallback {
+            font-family: 'DM Sans', sans-serif;
+            font-size: 17px;
+            font-style: italic;
+            font-weight: 600;
+            color: white;
+            letter-spacing: 0.5px;
+        }
+
+        .hero-main-title {
+            font-family: 'Playfair Display', Georgia, serif;
+            font-size: 78px;
+            font-weight: 300;
+            line-height: 1.0;
+            letter-spacing: -1px;
+            margin-top: 40px;
+        }
+
+        .hero-tagline {
+            font-family: 'Playfair Display', Georgia, serif;
+            font-size: 22px;
+            font-style: italic;
+            font-weight: 300;
+            color: rgba(255,255,255,0.75);
+            margin-top: 22px;
+            letter-spacing: 0.3px;
+        }
+
+        /* RIGHT LIGHT PANEL */
+        .hero-right {
+            flex: 1;
+            background: var(--light-bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            position: relative;
+        }
+
+        /* The curved divider between panels */
+        .curve {
+            position: absolute;
+            left: -110px;
+            top: 0;
+            bottom: 0;
+            width: 220px;
+            background: var(--light-bg);
+            border-radius: 55% 0 0 55%;
+            z-index: 2;
+        }
+
+        /* LOGIN CARD */
+        .login-card {
+            background: white;
+            border-radius: 22px;
+            padding: 48px 52px 40px;
+            box-shadow: 0 12px 48px rgba(0,0,0,0.14), 0 2px 8px rgba(0,0,0,0.08);
+            width: 100%;
+            max-width: 420px;
+            position: relative;
+            z-index: 10;
+        }
+
+        .login-card h2 {
+            font-family: 'DM Sans', sans-serif;
+            font-size: 26px;
+            font-weight: 600;
+            color: var(--text-dark);
+            margin-bottom: 32px;
+            text-align: center;
+            letter-spacing: -0.3px;
+        }
+
+        .form-group {
+            margin-bottom: 18px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 7px;
+            font-size: 13px;
+            font-weight: 500;
+            color: #555;
+            letter-spacing: 0.1px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1.5px solid var(--border);
+            border-radius: 9px;
+            font-size: 14px;
+            font-family: 'DM Sans', sans-serif;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            outline: none;
+            background: #fafafa;
+            color: var(--text-dark);
+        }
+
+        .form-group input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--input-focus);
+            background: white;
+        }
+
+        .remember-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 20px 0 22px;
+        }
+
+        .remember-row input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--accent);
+            cursor: pointer;
+        }
+
+        .remember-row label {
+            font-size: 13px;
+            color: var(--text-muted);
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .btn-signin {
+            width: 100%;
+            padding: 14px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 9px;
+            font-size: 15px;
+            font-weight: 600;
+            font-family: 'DM Sans', sans-serif;
+            cursor: pointer;
+            letter-spacing: 0.2px;
+            transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+            margin-bottom: 18px;
+        }
+
+        .btn-signin:hover {
+            background: var(--accent-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(232,93,74,0.35);
+        }
+
+        .btn-signin:active { transform: translateY(0); }
+
+        .card-footer-link {
+            text-align: center;
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .card-footer-link a {
+            color: var(--accent);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .card-footer-link a:hover { text-decoration: underline; }
+
+        /* Error / success messages */
+        .alert {
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-bottom: 16px;
+            display: none;
+        }
+
+        .alert.error { background: #fef2f2; color: #c0392b; border: 1px solid #fecaca; display: block; }
+        .alert.success { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; display: block; }
+
+        /* OTP screen (hidden by default) */
+        .otp-screen { display: none; }
+        .otp-screen.active { display: block; }
+        .main-screen { display: block; }
+        .main-screen.hidden { display: none; }
+
+        .otp-info {
+            background: #fff8f7;
+            border: 1px solid rgba(232,93,74,0.2);
+            border-radius: 10px;
+            padding: 14px 16px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            color: #666;
+            line-height: 1.5;
+        }
+
+        .otp-info strong { color: var(--accent); }
+
+        /* ── FEATURE HIGHLIGHTS ───────────────────────────────── */
+        .features {
+            background: white;
+            padding: 64px 80px 70px;
+        }
+
+        .features-label {
+            display: inline-block;
+            background: var(--dark);
+            color: white;
+            padding: 13px 28px;
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 2.5px;
+            text-transform: uppercase;
+            margin-bottom: 56px;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 50px;
+        }
+
+        .feature-item {
+            text-align: center;
+        }
+
+        .feature-icon-box {
+            width: 84px;
+            height: 84px;
+            margin: 0 auto 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2.5px solid var(--accent);
+            border-radius: 14px;
+            background: white;
+            transition: background 0.2s, transform 0.2s;
+        }
+
+        .feature-item:hover .feature-icon-box {
+            background: rgba(232,93,74,0.05);
+            transform: translateY(-3px);
+        }
+
+        .feature-icon-box i {
+            font-size: 34px;
+            color: var(--accent);
+        }
+
+        .feature-item h3 {
+            font-size: 17px;
+            font-weight: 600;
+            color: var(--text-dark);
+            line-height: 1.45;
+        }
+
+        /* ── FOOTER ──────────────────────────────────────────── */
+        .page-footer {
+            background: var(--dark);
+            color: white;
+            padding: 38px 80px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .footer-item {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            cursor: pointer;
+        }
+
+        .footer-icon-box {
+            width: 52px;
+            height: 52px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid var(--accent);
+            border-radius: 9px;
+            flex-shrink: 0;
+            transition: background 0.2s;
+        }
+
+        .footer-item:hover .footer-icon-box { background: rgba(232,93,74,0.1); }
+
+        .footer-icon-box i {
+            font-size: 22px;
+            color: var(--accent);
+        }
+
+        .footer-item span {
+            font-size: 15px;
+            font-weight: 500;
+            color: rgba(255,255,255,0.9);
+        }
+
+        /* ── RESPONSIVE ──────────────────────────────────────── */
+        @media (max-width: 1100px) {
+            .hero { flex-direction: column; min-height: auto; }
+            .hero-left { padding: 60px 40px 50px; }
+            .hero-right { padding: 50px 30px 60px; }
+            .curve { display: none; }
+            .hero-main-title { font-size: 58px; }
+            .features { padding: 50px 40px; }
+            .page-footer { padding: 32px 40px; flex-wrap: wrap; gap: 24px; }
+        }
+
+        @media (max-width: 700px) {
+            .hero-main-title { font-size: 44px; }
+            .login-card { padding: 36px 28px 32px; }
+            .features-grid { grid-template-columns: 1fr; gap: 36px; }
+            .features { padding: 40px 24px; }
+            .page-footer { padding: 28px 24px; flex-direction: column; align-items: flex-start; }
+        }
+
+        /* Loading spinner */
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,255,255,0.4);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            vertical-align: middle;
+            margin-right: 6px;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     HERO SECTION
+════════════════════════════════════════════════════════════════ -->
+<section class="hero">
+
+    <!-- LEFT DARK PANEL -->
+    <div class="hero-left">
+        <!-- Logo top-left -->
+        <div class="logo-wrap" id="logoWrap">
+            <!-- Logo image will be injected by JS or fallback to text -->
+            <span class="logo-fallback">techwish</span>
+        </div>
+
+        <h1 class="hero-main-title">TechWish<br>DocQuery</h1>
+        <p class="hero-tagline">AI-Powered Document Intelligence</p>
+    </div>
+
+    <!-- RIGHT LIGHT PANEL -->
+    <div class="hero-right">
+        <div class="curve"></div>
+
+        <!-- LOGIN CARD -->
+        <div class="login-card">
+            <div id="alertBox" class="alert"></div>
+
+            <!-- MAIN FORM SCREEN -->
+            <div class="main-screen" id="mainScreen">
+                <h2>Welcome Back</h2>
+                <form id="loginForm" autocomplete="off">
+                    <div class="form-group">
+                        <label for="emailInput">Email/Text</label>
+                        <input type="email" id="emailInput" placeholder="you@techwish.com" required autocomplete="username">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="passwordInput">Password</label>
+                        <input type="password" id="passwordInput" placeholder="" required autocomplete="current-password">
+                    </div>
+
+                    <div class="form-group" id="confirmGroup" style="display:none;">
+                        <label for="confirmInput">Confirm Password</label>
+                        <input type="password" id="confirmInput" placeholder="" autocomplete="new-password">
+                    </div>
+
+                    <div class="form-group" id="nameGroup" style="display:none;">
+                        <label for="nameInput">Full Name</label>
+                        <input type="text" id="nameInput" placeholder="Your full name" autocomplete="name">
+                    </div>
+
+                    <div class="remember-row">
+                        <input type="checkbox" id="rememberMe">
+                        <label for="rememberMe">Remember Me</label>
+                    </div>
+
+                    <button type="submit" class="btn-signin" id="submitBtn">Sign In</button>
+
+                    <div class="card-footer-link">
+                        <a href="#" id="toggleModeLink">Or Create Account</a>
+                    </div>
+                </form>
+            </div>
+
+            <!-- OTP VERIFICATION SCREEN -->
+            <div class="otp-screen" id="otpScreen">
+                <h2>Verify Email</h2>
+                <div class="otp-info">
+                    A verification code was sent to <strong id="otpEmailLabel"></strong>.<br>
+                    Enter the code below to continue.
+                </div>
+                <form id="otpForm">
+                    <div class="form-group">
+                        <label for="otpInput">Verification Code</label>
+                        <input type="text" id="otpInput" placeholder="e.g. A3X9KP2B" maxlength="8"
+                               autocomplete="one-time-code"
+                               style="font-size:18px;letter-spacing:3px;text-transform:uppercase;text-align:center;">
+                    </div>
+                    <button type="submit" class="btn-signin" id="otpSubmitBtn">Verify & Sign In</button>
+                    <div class="card-footer-link" style="margin-top:10px;">
+                        <a href="#" id="backToLoginLink">← Back to Login</a>
+                    </div>
+                </form>
+            </div>
+
+        </div><!-- /login-card -->
+    </div><!-- /hero-right -->
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     FEATURE HIGHLIGHTS
+════════════════════════════════════════════════════════════════ -->
+<section class="features">
+    <div class="features-label">Feature Highlights</div>
+    <div class="features-grid">
+        <div class="feature-item">
+            <div class="feature-icon-box">
+                <i class="fas fa-comments"></i>
+            </div>
+            <h3>Query documents<br>with natural language</h3>
+        </div>
+        <div class="feature-item">
+            <div class="feature-icon-box">
+                <i class="fas fa-bolt"></i>
+            </div>
+            <h3>Instant intelligent<br>extraction</h3>
+        </div>
+        <div class="feature-item">
+            <div class="feature-icon-box">
+                <i class="fas fa-brain"></i>
+            </div>
+            <h3>AI-driven<br>understanding</h3>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     FOOTER
+════════════════════════════════════════════════════════════════ -->
+<footer class="page-footer">
+    <div class="footer-item" onclick="showForgotPassword()">
+        <div class="footer-icon-box"><i class="fas fa-key"></i></div>
+        <span>Forgot Password?</span>
+    </div>
+    <div class="footer-item" onclick="switchToRegister()">
+        <div class="footer-icon-box"><i class="fas fa-user-plus"></i></div>
+        <span>Don't have an account? Sign up</span>
+    </div>
+    <div class="footer-item">
+        <div class="footer-icon-box"><i class="fas fa-shield-alt"></i></div>
+        <span>Remember me</span>
+    </div>
+</footer>
+
+<script>
+// ─── State ───────────────────────────────────────────────────────
+let isRegisterMode = false;
+let pendingEmail   = '';
+
+// ─── Logo: try loading from same folder ──────────────────────────
+(function loadLogo() {
+    const candidates = ['Techwish-Logo-white (3).png', 'techwish-logo.png', 'logo.png'];
+    const wrap = document.getElementById('logoWrap');
+
+    function tryNext(i) {
+        if (i >= candidates.length) return; // fallback text stays
+        const img = new Image();
+        img.onload = () => {
+            wrap.innerHTML = '';
+            img.style.cssText = 'height:36px;display:block;object-fit:contain;';
+            wrap.appendChild(img);
+        };
+        img.onerror = () => tryNext(i + 1);
+        img.src = candidates[i];
+    }
+    tryNext(0);
+})();
+
+// ─── Toggle Register / Login ──────────────────────────────────────
+const toggleLink    = document.getElementById('toggleModeLink');
+const confirmGroup  = document.getElementById('confirmGroup');
+const nameGroup     = document.getElementById('nameGroup');
+const submitBtn     = document.getElementById('submitBtn');
+
+toggleLink.addEventListener('click', (e) => {
+    e.preventDefault();
+    switchToRegister(!isRegisterMode);
+});
+
+function switchToRegister(toReg = true) {
+    isRegisterMode = toReg;
+    confirmGroup.style.display = toReg ? 'block' : 'none';
+    nameGroup.style.display    = toReg ? 'block' : 'none';
+    submitBtn.textContent      = toReg ? 'Create Account' : 'Sign In';
+    toggleLink.textContent     = toReg ? 'Already have an account? Sign in' : 'Or Create Account';
+    document.querySelector('.login-card h2').textContent = toReg ? 'Create Account' : 'Welcome Back';
+    clearAlert();
+}
+
+// ─── Alert helpers ────────────────────────────────────────────────
+const alertBox = document.getElementById('alertBox');
+function showAlert(msg, type = 'error') {
+    alertBox.textContent = msg;
+    alertBox.className   = `alert ${type}`;
+}
+function clearAlert() {
+    alertBox.textContent = '';
+    alertBox.className   = 'alert';
+}
+
+// ─── Login / Register form submit ─────────────────────────────────
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    clearAlert();
+
+    const email    = document.getElementById('emailInput').value.trim().toLowerCase();
+    const password = document.getElementById('passwordInput').value;
+
+    if (!email || !password) { showAlert('Please fill in all fields.'); return; }
+    if (!email.endsWith('@techwish.com')) { showAlert('Only @techwish.com emails are allowed.'); return; }
+
+    if (isRegisterMode) {
+        const confirm  = document.getElementById('confirmInput').value;
+        const fullName = document.getElementById('nameInput').value.trim();
+        if (!fullName) { showAlert('Please enter your full name.'); return; }
+        if (password.length < 8) { showAlert('Password must be at least 8 characters.'); return; }
+        if (password !== confirm) { showAlert('Passwords do not match.'); return; }
+    }
+
+    setLoading(submitBtn, true);
+
+    try {
+        const endpoint = isRegisterMode ? '/api/register' : '/api/login';
+        const body = isRegisterMode
+            ? { email, password, full_name: document.getElementById('nameInput').value.trim() }
+            : { email, password };
+
+        const resp = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+
+        const data = await resp.json();
+
+        if (resp.ok && data.otp_sent) {
+            pendingEmail = email;
+            showOtpScreen(email);
+        } else {
+            showAlert(data.error || 'Something went wrong. Please try again.');
+        }
+    } catch (err) {
+        showAlert('Network error. Is the server running?');
+    } finally {
+        setLoading(submitBtn, false);
+    }
+});
+
+// ─── OTP Screen ────────────────────────────────────────────────────
+function showOtpScreen(email) {
+    document.getElementById('mainScreen').classList.add('hidden');
+    document.getElementById('otpScreen').classList.add('active');
+    document.getElementById('otpEmailLabel').textContent = email;
+    clearAlert();
+}
+
+document.getElementById('backToLoginLink').addEventListener('click', (e) => {
+    e.preventDefault();
+    document.getElementById('mainScreen').classList.remove('hidden');
+    document.getElementById('otpScreen').classList.remove('active');
+    clearAlert();
+});
+
+document.getElementById('otpForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    clearAlert();
+
+    const otp = document.getElementById('otpInput').value.trim().toUpperCase();
+    if (otp.length < 6) { showAlert('Please enter the full verification code.'); return; }
+
+    const otpBtn = document.getElementById('otpSubmitBtn');
+    setLoading(otpBtn, true);
+
+    try {
+        const resp = await fetch('/api/verify-otp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: pendingEmail, otp }),
+        });
+        const data = await resp.json();
+
+        if (resp.ok && data.success) {
+            showAlert('Verified! Redirecting…', 'success');
+            setTimeout(() => { window.location.href = '/chat'; }, 900);
+        } else {
+            showAlert(data.error || 'Invalid or expired code.');
+        }
+    } catch (err) {
+        showAlert('Network error. Please try again.');
+    } finally {
+        setLoading(otpBtn, false);
+    }
+});
+
+// ─── Utility ──────────────────────────────────────────────────────
+function setLoading(btn, loading) {
+    if (loading) {
+        btn.disabled   = true;
+        btn.innerHTML  = '<span class="spinner"></span>Please wait…';
+    } else {
+        btn.disabled = false;
+        btn.textContent = isRegisterMode ? 'Create Account' : 'Sign In';
+    }
+}
+
+function showForgotPassword() {
+    showAlert('Password reset is sent to your email if the account exists.', 'success');
+}
+</script>
+</body>
+</html>
