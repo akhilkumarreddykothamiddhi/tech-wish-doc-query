@@ -835,157 +835,85 @@ def ask_groq_smalltalk(prompt: str) -> str:
     return resp.choices[0].message.content
 
 # ─────────────────────────────────────────────────────────────────
-#  SESSION INIT
+#  SESSION INIT (Do this first!)
 # ─────────────────────────────────────────────────────────────────
 for k, v in {
     "user_id": None, "user_email": None, "user_name": None,
     "chat_sid": None, "chat_msgs": [],
-    "logged_out": False,   # FIX: track explicit logout
+    "logged_out": False,
+    "redirect_url": None
 }.items():
     if k not in st.session_state:
         st.session_state[k] = v
+
 # ─────────────────────────────────────────────────────────────────
-#  AUTHENTICATION & REDIRECTION HANDLER (PLACE AFTER SESSION INIT)
+#  AUTH & REDIRECT HANDLER (The "Brain")
 # ─────────────────────────────────────────────────────────────────
 
-# A. Handle the return from Google (Callback)
-if "code" in st.query_params and not st.session_state.user_id and not st.session_state.logged_out:
+# 1. Handle the return from Google (The Callback)
+if "code" in st.query_params and not st.session_state.user_id:
     try:
-        sess = supabase_client().auth.exchange_code_for_session({"auth_code": st.query_params["code"]})
-        user = sess.user
+        # Swap code for session
+        res = supabase_client().auth.exchange_code_for_session({"auth_code": st.query_params["code"]})
+        user = res.user
+        
+        # Domain Guard
         if ALLOWED_DOMAIN and not user.email.endswith(f"@{ALLOWED_DOMAIN}"):
             st.error(f"Access restricted to @{ALLOWED_DOMAIN} accounts.")
             st.stop()
-        
+            
         st.session_state.user_id = user.id
         st.session_state.user_email = user.email
         st.session_state.user_name = user.user_metadata.get("full_name", user.email.split("@")[0])
         st.session_state.logged_out = False
+        
         db_upsert_user(user.id, user.email, st.session_state.user_name)
         
+        # Clear URL and Rerun
         st.query_params.clear()
         st.rerun()
     except Exception as e:
         st.query_params.clear()
-        st.error(f"Auth error: {e}")
+        st.error(f"Authentication failed. Please try again.")
 
-# B. Handle the breakout to Google (The Redirect)
-if "redirect_url" in st.session_state and st.session_state.redirect_url:
+# 2. Handle the breakout to Google (The Redirector)
+if st.session_state.redirect_url:
     url = st.session_state.redirect_url
-    st.session_state.redirect_url = None 
-    # Using st.components for a cleaner breakout
+    st.session_state.redirect_url = None # Reset
+    
+    # This JS breakout is critical for Cloud Deployments (Iframes)
     st.components.v1.html(f"""
         <script>
             window.top.location.href = "{url}";
         </script>
     """, height=0)
-    st.stop()
-# ─────────────────────────────────────────────────────────────────
-#  OAUTH CALLBACK — only process if not logged out
-# ─────────────────────────────────────────────────────────────────
-if "code" in st.query_params and not st.session_state.user_id and not st.session_state.logged_out:
-    try:
-        sess = supabase_client().auth.exchange_code_for_session({"auth_code": st.query_params["code"]})
-        user = sess.user
-        if ALLOWED_DOMAIN and not user.email.endswith(f"@{ALLOWED_DOMAIN}"):
-            st.error(f"Access restricted to @{ALLOWED_DOMAIN} accounts.")
-            st.stop()
-        st.session_state.user_id    = user.id
-        st.session_state.user_email = user.email
-        st.session_state.user_name  = user.user_metadata.get("full_name", user.email.split("@")[0])
-        st.session_state.logged_out = False
-        db_upsert_user(user.id, user.email, st.session_state.user_name)
-        st.query_params.clear()
-        st.rerun()
-    except Exception as e:
-        st.error(f"Auth error: {e}")
-
-# ─────────────────────────────────────────────────────────────────
-#  1. LOGIN PAGE (CLEAN & FIXED)
-# ─────────────────────────────────────────────────────────────────
-
-# ─────────────────────────────────────────────────────────────────
-#  1. LOGIN PAGE (CLEAN & FIXED)
-# ─────────────────────────────────────────────────────────────────
-
-# --- REDIRECT HANDLER ---
-if "redirect_url" in st.session_state and st.session_state.redirect_url:
-    url = st.session_state.redirect_url
-    st.session_state.redirect_url = None
-    st.components.v1.html(f"""
-        <script>
-            window.top.location.href = "{url}";
-        </script>
-    """, height=0)
+    st.info("Redirecting to secure login...")
     st.stop()
 
+# ─────────────────────────────────────────────────────────────────
+#  1. LOGIN PAGE
+# ─────────────────────────────────────────────────────────────────
 if not st.session_state.user_id:
-
-    # Clear OAuth code if user logged out
-    if "code" in st.query_params and st.session_state.logged_out:
-        st.query_params.clear()
-
-    # Background UI
-    st.markdown('<div class="login-bg"></div>', unsafe_allow_html=True)
-    st.markdown('<div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div>', unsafe_allow_html=True)
-
-    # Logo top bar
-    b64 = logo_b64(LOGO_PATH)
-    if b64:
-        st.markdown(
-            f'<div class="login-top-bar"><img src="{b64}" height="36"></div>',
-            unsafe_allow_html=True
-        )
-
-    # Center card
-    _, col, _ = st.columns([1, 1.2, 1])
-
-    with col:
-        st.markdown("""
-        <div class="login-card-html">
-            <div class="login-badge">Techwish AI</div>
-            <div class="login-title">Welcome Back</div>
-            <div class="login-sub">
-                Sign in securely using your company Google account
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        # ✅ SINGLE BUTTON ONLY (FIXED)
-        st.markdown('<div class="login-btn-wrap">', unsafe_allow_html=True)
-
-        if st.button("🔑 Continue with Google", use_container_width=True):
-            try:
-                supabase_client().auth.sign_out()
-            except:
-                pass
-
-            res = supabase_client().auth.sign_in_with_oauth({
-                "provider": "google",
-                "options": {
-                    "redirect_to": APP_URL,
-                    "scopes": "email profile",
-                    "query_params": {"prompt": "select_account"}
-                }
-            })
-
-            if res.url:
-                st.session_state.redirect_url = res.url
-                st.rerun()
-
-        st.markdown('</div>', unsafe_allow_html=True)
-
-        # Bottom features
-        st.markdown("""
-        <div class="login-card-bottom">
-            <div class="feature-row">
-                <div class="feature-chip"><div class="ficon">📄</div>PDF-powered</div>
-                <div class="feature-chip"><div class="ficon">⚡</div>Instant answers</div>
-                <div class="feature-chip"><div class="ficon">🔒</div>@techwish.com only</div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
+    # (Your CSS and UI Code here...)
+    
+    if st.button("🔑 Continue with Google", use_container_width=True):
+        # Force a clean slate
+        try:
+            supabase_client().auth.sign_out()
+        except:
+            pass
+            
+        res = supabase_client().auth.sign_in_with_oauth({
+            "provider": "google",
+            "options": {
+                "redirect_to": APP_URL,
+                "query_params": {"prompt": "select_account"} 
+            }
+        })
+        
+        if res.url:
+            st.session_state.redirect_url = res.url
+            st.rerun() # Triggers the breakout handler above
     st.stop()
 # ─────────────────────────────────────────────────────────────────
 #  2. BUILD INDEX
