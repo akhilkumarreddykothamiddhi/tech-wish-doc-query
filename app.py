@@ -10,17 +10,7 @@ from supabase import create_client
 import snowflake.connector
 
 # ─────────────────────────────────────────────────────────────────
-#  PAGE CONFIG — MUST be the very first Streamlit call
-# ─────────────────────────────────────────────────────────────────
-st.set_page_config(
-    page_title="Techwish AI",
-    page_icon="🧠",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
-
-# ─────────────────────────────────────────────────────────────────
-#  BRANDING & ASSETS
+#  TECHWISH BRANDING & ASSETS
 # ─────────────────────────────────────────────────────────────────
 LOGO_PATH    = "Techwish-Logo-white (3).png"
 COMPANY_NAME = "Techwish AI"
@@ -44,22 +34,24 @@ SNOWFLAKE_SCHEMA    = cfg("SNOWFLAKE_SCHEMA",     "PUBLIC")
 SUPABASE_URL      = cfg("SUPABASE_URL")
 SUPABASE_ANON_KEY = cfg("SUPABASE_ANON_KEY")
 GROQ_API_KEY      = cfg("GROQ_API_KEY")
-APP_URL           = cfg("APP_URL", "https://docquey-techwish.streamlit.app")
+APP_URL           = cfg("APP_URL", "https://docquey-techwish.streamlit.app/")
 ALLOWED_DOMAIN    = cfg("ALLOWED_DOMAIN", "techwish.com")
 
 # ─────────────────────────────────────────────────────────────────
-#  DOCS / MODEL CONSTANTS
+#  DOCS FOLDER
 # ─────────────────────────────────────────────────────────────────
 DOCS_FOLDER   = "docs"
+
 GROQ_MODEL    = "llama-3.1-8b-instant"
 EMBED_MODEL   = "all-MiniLM-L6-v2"
 CHUNK_SIZE    = 500
 CHUNK_OVERLAP = 80
 TOP_K         = 4
+
 NO_CONTEXT_MSG = "I'm sorry, I don't have information about that in the available documents."
 
 # ─────────────────────────────────────────────────────────────────
-#  SMALL TALK DETECTION
+#  SMALL TALK / GREETING DETECTION
 # ─────────────────────────────────────────────────────────────────
 SMALL_TALK_KEYWORDS = [
     "hi", "hello", "hey", "hru", "how are you", "how r u", "good morning",
@@ -75,6 +67,7 @@ SMALL_TALK_KEYWORDS = [
 
 def is_small_talk(text: str) -> bool:
     t = text.lower().strip()
+    # Short messages (under 6 words) that don't look like document queries
     words = t.split()
     if len(words) <= 6:
         for kw in SMALL_TALK_KEYWORDS:
@@ -89,70 +82,14 @@ Mention that you can answer questions about company documents, policies, and mor
 Keep your reply concise — 1 to 3 sentences max."""
 
 # ─────────────────────────────────────────────────────────────────
-#  SESSION STATE INIT
+#  PAGE CONFIG
 # ─────────────────────────────────────────────────────────────────
-for k, v in {
-    "user_id":    None,
-    "user_email": None,
-    "user_name":  None,
-    "chat_sid":   None,
-    "chat_msgs":  [],
-}.items():
-    if k not in st.session_state:
-        st.session_state[k] = v
-
-# ─────────────────────────────────────────────────────────────────
-#  SUPABASE CLIENT
-# ─────────────────────────────────────────────────────────────────
-@st.cache_resource
-def supabase_client():
-    return create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
-
-# ─────────────────────────────────────────────────────────────────
-#  AUTH — Handle OAuth callback
-#  Supports BOTH flows:
-#   • implicit flow  → access_token in URL hash, extracted by JS
-#                      and passed back as ?access_token=
-#   • PKCE flow      → ?code= in query params (fallback)
-# ─────────────────────────────────────────────────────────────────
-
-def _handle_auth_user(user):
-    """Shared logic after getting a valid Supabase user."""
-    if ALLOWED_DOMAIN and not user.email.endswith(f"@{ALLOWED_DOMAIN}"):
-        st.query_params.clear()
-        st.error(f"❌ Access restricted to @{ALLOWED_DOMAIN} accounts.")
-        st.stop()
-    st.session_state.user_id    = user.id
-    st.session_state.user_email = user.email
-    st.session_state.user_name  = (
-        user.user_metadata.get("full_name") or user.email.split("@")[0]
-    )
-    st.query_params.clear()
-    st.rerun()
-
-# A) Implicit flow — access_token extracted from URL hash by JS
-if "access_token" in st.query_params and not st.session_state.user_id:
-    try:
-        access_token  = st.query_params["access_token"]
-        refresh_token = st.query_params.get("refresh_token", "")
-        res  = supabase_client().auth.set_session(access_token, refresh_token)
-        _handle_auth_user(res.user)
-    except Exception as e:
-        st.query_params.clear()
-        st.error(f"Authentication failed: {e}. Please try again.")
-        st.stop()
-
-# B) PKCE flow — ?code= in query params
-elif "code" in st.query_params and not st.session_state.user_id:
-    try:
-        res  = supabase_client().auth.exchange_code_for_session(
-            {"auth_code": st.query_params["code"]}
-        )
-        _handle_auth_user(res.user)
-    except Exception as e:
-        st.query_params.clear()
-        st.error(f"Authentication failed: {e}. Please try again.")
-        st.stop()
+st.set_page_config(
+    page_title=COMPANY_NAME,
+    page_icon="🧠",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 
 # ─────────────────────────────────────────────────────────────────
 #  LOGO HELPER
@@ -191,7 +128,7 @@ section[data-testid="stMain"] { height: 100vh !important; overflow-y: auto !impo
 section[data-testid="stMain"] > div { padding-top: 0 !important; }
 .block-container { padding: 0 !important; max-width: 100% !important; }
 
-/* ═══ SIDEBAR ═══════════════════════════════════════════════════ */
+/* ═══ SIDEBAR ══════════════════════════════════════════════════ */
 section[data-testid="stSidebar"] {
     background: #0b0f1e !important;
     border-right: 1px solid rgba(255,255,255,0.07) !important;
@@ -210,159 +147,420 @@ section[data-testid="stSidebar"] > div {
     flex-direction: column !important;
     height: 100% !important;
 }
+
+/* ── Collapse toggle (<<) top-right of sidebar ── */
 button[data-testid="baseButton-headerNoPadding"],
 [data-testid="stSidebarCollapseButton"] {
-    position: absolute !important; top: 14px !important; right: 10px !important;
-    z-index: 9999 !important; background: rgba(99,102,241,0.12) !important;
-    border: 1px solid rgba(99,102,241,0.30) !important; border-radius: 8px !important;
-    color: #a5b4fc !important; padding: 4px 8px !important; font-size: 0.75rem !important;
-    cursor: pointer !important; transition: all 0.2s ease !important;
+    position: absolute !important;
+    top: 14px !important;
+    right: 10px !important;
+    z-index: 9999 !important;
+    background: rgba(99,102,241,0.12) !important;
+    border: 1px solid rgba(99,102,241,0.30) !important;
+    border-radius: 8px !important;
+    color: #a5b4fc !important;
+    padding: 4px 8px !important;
+    font-size: 0.75rem !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
 }
 button[data-testid="baseButton-headerNoPadding"]:hover,
 [data-testid="stSidebarCollapseButton"]:hover {
-    background: rgba(99,102,241,0.25) !important; color: white !important;
+    background: rgba(99,102,241,0.25) !important;
+    color: white !important;
 }
+
+/* Collapsed toggle — floating tab on left edge */
 [data-testid="collapsedControl"] {
-    display: flex !important; visibility: visible !important; opacity: 1 !important;
-    position: fixed !important; left: 0 !important; top: 50% !important;
-    transform: translateY(-50%) !important; z-index: 9999 !important;
-    background: rgba(99,102,241,0.18) !important; border: 1px solid rgba(99,102,241,0.4) !important;
-    border-left: none !important; border-radius: 0 10px 10px 0 !important;
-    padding: 14px 8px !important; cursor: pointer !important; transition: all 0.2s ease !important;
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: fixed !important;
+    left: 0 !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    z-index: 9999 !important;
+    background: rgba(99,102,241,0.18) !important;
+    border: 1px solid rgba(99,102,241,0.4) !important;
+    border-left: none !important;
+    border-radius: 0 10px 10px 0 !important;
+    padding: 14px 8px !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
     box-shadow: 4px 0 20px rgba(99,102,241,0.2) !important;
 }
 [data-testid="collapsedControl"]:hover {
-    background: rgba(99,102,241,0.35) !important; padding-right: 14px !important;
+    background: rgba(99,102,241,0.35) !important;
+    padding-right: 14px !important;
 }
 [data-testid="collapsedControl"] svg { fill: #a5b4fc !important; }
 
-/* Sidebar header */
-.sb-header { padding: 1.4rem 1.2rem 1rem; border-bottom: 1px solid rgba(255,255,255,0.07); position: relative; }
-.sb-logo-wrap { display: flex; align-items: center; gap: 8px; margin-bottom: 0.35rem; }
-.sb-logo-wrap img { max-width: 130px !important; height: auto !important; display: block !important; }
-.sb-logo-text { font-size: 1.15rem; font-weight: 800; color: white; letter-spacing: -0.02em; }
-.sb-tagline { font-size: 0.72rem; color: rgba(255,255,255,0.35); font-weight: 400; letter-spacing: 0.01em; margin-top: 2px; }
-.sb-section { padding: 1rem 1.2rem 0.6rem; border-bottom: 1px solid rgba(255,255,255,0.06); }
-.sb-section-label { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.13em; text-transform: uppercase; color: rgba(255,255,255,0.22); margin-bottom: 0.6rem; }
-.sb-bottom { padding: 0.8rem 1.2rem; margin-top: auto; border-top: 1px solid rgba(255,255,255,0.06); display: flex; flex-direction: column; gap: 6px; }
+/* ── Sidebar logo + tagline block ── */
+.sb-header {
+    padding: 1.4rem 1.2rem 1rem;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    position: relative;
+}
+.sb-logo-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 0.35rem;
+}
+.sb-logo-wrap img {
+    max-width: 130px !important;
+    height: auto !important;
+    display: block !important;
+}
+.sb-logo-text {
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: white;
+    letter-spacing: -0.02em;
+}
+.sb-tagline {
+    font-size: 0.72rem;
+    color: rgba(255,255,255,0.35);
+    font-weight: 400;
+    letter-spacing: 0.01em;
+    margin-top: 2px;
+}
 
-/* User pill */
-.user-pill { background: rgba(99,102,241,0.07); border: 1px solid rgba(99,102,241,0.18); border-radius: 12px; padding: 10px 12px; margin: 0 1.2rem 0.8rem; display: flex; align-items: center; gap: 10px; }
-.user-avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #6366f1, #ec4899); display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; color: white; flex-shrink: 0; }
+/* ── Sidebar sections ── */
+.sb-section {
+    padding: 1rem 1.2rem 0.6rem;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.sb-section-label {
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.22);
+    margin-bottom: 0.6rem;
+}
+.sb-bottom {
+    padding: 0.8rem 1.2rem;
+    margin-top: auto;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+/* ── User pill ── */
+.user-pill {
+    background: rgba(99,102,241,0.07);
+    border: 1px solid rgba(99,102,241,0.18);
+    border-radius: 12px;
+    padding: 10px 12px;
+    margin: 0 1.2rem 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.user-avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: linear-gradient(135deg, #6366f1, #ec4899);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.75rem; font-weight: 700; color: white; flex-shrink: 0;
+}
 .user-info { overflow: hidden; }
 .user-name  { font-size: 0.8rem; font-weight: 600; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .user-email { font-size: 0.66rem; color: rgba(255,255,255,0.32); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* Sidebar buttons */
+/* ── All sidebar buttons reset ── */
 section[data-testid="stSidebar"] div[data-testid="stButton"] > button {
-    background: rgba(255,255,255,0.04) !important; border: 1px solid rgba(255,255,255,0.08) !important;
-    color: rgba(255,255,255,0.70) !important; border-radius: 10px !important; font-size: 0.82rem !important;
-    padding: 0.52rem 0.85rem !important; text-align: left !important; transition: all 0.15s ease !important;
-    box-shadow: none !important; width: 100% !important;
+    background: rgba(255,255,255,0.04) !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    color: rgba(255,255,255,0.70) !important;
+    border-radius: 10px !important;
+    font-size: 0.82rem !important;
+    padding: 0.52rem 0.85rem !important;
+    text-align: left !important;
+    transition: all 0.15s ease !important;
+    box-shadow: none !important;
+    width: 100% !important;
 }
 section[data-testid="stSidebar"] div[data-testid="stButton"] > button:hover {
-    background: rgba(99,102,241,0.12) !important; border-color: rgba(99,102,241,0.32) !important; color: white !important;
+    background: rgba(99,102,241,0.12) !important;
+    border-color: rgba(99,102,241,0.32) !important;
+    color: white !important;
 }
+
+/* New conversation */
 .new-chat-btn div[data-testid="stButton"] > button {
     background: linear-gradient(135deg, rgba(99,102,241,0.18), rgba(139,92,246,0.18)) !important;
-    border: 1px solid rgba(99,102,241,0.32) !important; color: #c4b5fd !important; font-weight: 700 !important;
+    border: 1px solid rgba(99,102,241,0.32) !important;
+    color: #c4b5fd !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.01em !important;
 }
 .new-chat-btn div[data-testid="stButton"] > button:hover {
-    background: linear-gradient(135deg, rgba(99,102,241,0.30), rgba(139,92,246,0.28)) !important; color: white !important;
+    background: linear-gradient(135deg, rgba(99,102,241,0.30), rgba(139,92,246,0.28)) !important;
+    color: white !important;
 }
+
+/* Chat history items */
+section[data-testid="stSidebar"] div[data-testid="stButton"] > button[kind="secondary"] {
+    text-align: left !important;
+    justify-content: flex-start !important;
+}
+
+/* Clear chat — subtle red */
 .clear-btn div[data-testid="stButton"] > button {
-    background: rgba(239,68,68,0.07) !important; border: 1px solid rgba(239,68,68,0.20) !important;
-    color: rgba(248,113,113,0.85) !important; font-weight: 600 !important;
+    background: rgba(239,68,68,0.07) !important;
+    border: 1px solid rgba(239,68,68,0.20) !important;
+    color: rgba(248,113,113,0.85) !important;
+    font-weight: 600 !important;
 }
 .clear-btn div[data-testid="stButton"] > button:hover {
-    background: rgba(239,68,68,0.16) !important; border-color: rgba(239,68,68,0.45) !important; color: #fca5a5 !important;
+    background: rgba(239,68,68,0.16) !important;
+    border-color: rgba(239,68,68,0.45) !important;
+    color: #fca5a5 !important;
 }
+
+/* Sign out */
 .signout-btn div[data-testid="stButton"] > button {
-    background: rgba(255,255,255,0.02) !important; border: 1px solid rgba(255,255,255,0.08) !important; color: rgba(255,255,255,0.40) !important;
+    background: rgba(255,255,255,0.02) !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    color: rgba(255,255,255,0.40) !important;
 }
 .signout-btn div[data-testid="stButton"] > button:hover {
-    background: rgba(99,102,241,0.09) !important; border-color: rgba(99,102,241,0.28) !important; color: #a5b4fc !important;
+    background: rgba(99,102,241,0.09) !important;
+    border-color: rgba(99,102,241,0.28) !important;
+    color: #a5b4fc !important;
 }
+
+/* Section headings inside sidebar */
 section[data-testid="stSidebar"] h3 {
-    font-size: 0.6rem !important; text-transform: uppercase !important; letter-spacing: 0.13em !important;
-    color: rgba(255,255,255,0.22) !important; margin: 0 0 0.5rem !important; font-weight: 700 !important; padding: 0 !important;
+    font-size: 0.6rem !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.13em !important;
+    color: rgba(255,255,255,0.22) !important;
+    margin: 0 0 0.5rem !important;
+    font-weight: 700 !important;
+    padding: 0 !important;
 }
 
 /* ═══ LOGIN PAGE ════════════════════════════════════════════════ */
-.login-bg { position: fixed; inset: 0; z-index: 0;
-    background: radial-gradient(ellipse 80% 60% at 20% 0%, rgba(99,102,241,0.18) 0%, transparent 60%),
-                radial-gradient(ellipse 60% 50% at 80% 100%, rgba(236,72,153,0.14) 0%, transparent 60%),
-                radial-gradient(ellipse 50% 40% at 50% 50%, rgba(14,165,233,0.08) 0%, transparent 70%),
-                #050810;
+.login-bg {
+    position: fixed; inset: 0; z-index: 0;
+    background:
+        radial-gradient(ellipse 80% 60% at 20% 0%, rgba(99,102,241,0.18) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 50% at 80% 100%, rgba(236,72,153,0.14) 0%, transparent 60%),
+        radial-gradient(ellipse 50% 40% at 50% 50%, rgba(14,165,233,0.08) 0%, transparent 70%),
+        #050810;
 }
 .orb { position: fixed; border-radius: 50%; filter: blur(80px); pointer-events: none; z-index: 0; animation: float 8s ease-in-out infinite; }
 .orb-1 { width:500px; height:500px; top:-100px; left:-100px; background:rgba(99,102,241,0.12); animation-delay:0s; }
 .orb-2 { width:400px; height:400px; bottom:-80px; right:-80px; background:rgba(236,72,153,0.10); animation-delay:-3s; }
-@keyframes float { 0%,100% { transform: translate(0,0) scale(1); } 33% { transform: translate(30px,-20px) scale(1.05); } 66% { transform: translate(-20px,30px) scale(0.95); } }
-.login-card-html { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-bottom: none; border-radius: 28px 28px 0 0; padding: 3rem 3rem 1.5rem; text-align: center; backdrop-filter: blur(24px); }
-.login-card-bottom { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-top: none; border-radius: 0 0 28px 28px; padding: 0.5rem 3rem 2.5rem; backdrop-filter: blur(24px); }
-.login-badge { display: inline-flex; align-items: center; gap: 8px; background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.3); border-radius: 999px; padding: 6px 16px; margin-bottom: 1.8rem; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #a5b4fc; }
-.login-title { font-size: 2.8rem; font-weight: 800; line-height: 1.1; letter-spacing: -0.03em; margin: 0 0 0.5rem; background: linear-gradient(135deg, #fff 0%, rgba(165,180,252,0.9) 50%, rgba(236,72,153,0.8) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-.login-sub { font-size: 0.95rem; color: rgba(255,255,255,0.4); margin-bottom: 1.2rem; font-weight: 300; line-height: 1.6; }
+.orb-3 { width:300px; height:300px; top:40%; left:60%; background:rgba(14,165,233,0.08); animation-delay:-6s; }
+@keyframes float {
+    0%,100% { transform: translate(0,0) scale(1); }
+    33%      { transform: translate(30px,-20px) scale(1.05); }
+    66%      { transform: translate(-20px,30px) scale(0.95); }
+}
+.login-top-bar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+    padding: 1rem 2rem;
+    background: rgba(5,8,16,0.6);
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    backdrop-filter: blur(12px);
+}
+.login-card-html {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-bottom: none;
+    border-radius: 28px 28px 0 0;
+    padding: 3rem 3rem 1.5rem;
+    text-align: center;
+    box-shadow: 0 0 0 1px rgba(99,102,241,0.1), inset 0 1px 0 rgba(255,255,255,0.06);
+    backdrop-filter: blur(24px);
+}
+.login-card-bottom {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-top: none;
+    border-radius: 0 0 28px 28px;
+    padding: 0.5rem 3rem 2.5rem;
+    box-shadow: 0 40px 80px rgba(0,0,0,0.5), inset 0 -1px 0 rgba(255,255,255,0.04);
+    backdrop-filter: blur(24px);
+}
+.login-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.3);
+    border-radius: 999px; padding: 6px 16px; margin-bottom: 1.8rem;
+    font-size: 0.72rem; font-weight: 600; letter-spacing: 0.1em;
+    text-transform: uppercase; color: #a5b4fc;
+}
+.login-title {
+    font-size: 2.8rem; font-weight: 800; line-height: 1.1;
+    letter-spacing: -0.03em; margin: 0 0 0.5rem;
+    background: linear-gradient(135deg, #fff 0%, rgba(165,180,252,0.9) 50%, rgba(236,72,153,0.8) 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+.login-sub {
+    font-size: 0.95rem; color: rgba(255,255,255,0.4);
+    margin-bottom: 1.2rem; font-weight: 300; line-height: 1.6;
+}
+.login-divider-line { height: 1px; background: rgba(255,255,255,0.07); margin-bottom: 0; }
 .feature-row { display: flex; gap: 12px; margin-top: 1.2rem; }
-.feature-chip { flex: 1; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 12px 8px; font-size: 0.7rem; color: rgba(255,255,255,0.4); text-align: center; }
+.feature-chip {
+    flex: 1; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px; padding: 12px 8px; font-size: 0.7rem;
+    color: rgba(255,255,255,0.4); text-align: center;
+}
 .feature-chip .ficon { font-size: 1.2rem; margin-bottom: 4px; }
-.login-btn-wrap { background: rgba(255,255,255,0.03); border-left: 1px solid rgba(255,255,255,0.08); border-right: 1px solid rgba(255,255,255,0.08); padding: 1.4rem 3rem; position: relative; z-index: 500; }
+.login-btn-wrap {
+    background: rgba(255,255,255,0.03);
+    border-left: 1px solid rgba(255,255,255,0.08);
+    border-right: 1px solid rgba(255,255,255,0.08);
+    padding: 1.4rem 3rem;
+    position: relative; z-index: 500;
+}
 .login-btn-wrap div[data-testid="stButton"] > button {
     background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #ec4899 100%) !important;
-    color: white !important; font-weight: 700 !important; font-size: 1rem !important;
-    border-radius: 14px !important; padding: 0.85rem 1.5rem !important; border: none !important;
+    color: white !important; font-family: 'Outfit', sans-serif !important;
+    font-weight: 700 !important; font-size: 1rem !important;
+    border-radius: 14px !important; padding: 0.85rem 1.5rem !important;
+    border: none !important; cursor: pointer !important; width: 100% !important;
     box-shadow: 0 8px 32px rgba(99,102,241,0.45), 0 2px 0 rgba(255,255,255,0.12) inset !important;
+    transition: all 0.2s ease !important; z-index: 500 !important;
 }
 .login-btn-wrap div[data-testid="stButton"] > button:hover {
     transform: translateY(-2px) !important;
     box-shadow: 0 16px 48px rgba(99,102,241,0.6), 0 2px 0 rgba(255,255,255,0.15) inset !important;
 }
 
+div[data-testid="stButton"] > button {
+    font-family: 'Outfit', sans-serif !important;
+    font-weight: 600 !important; font-size: 0.9rem !important;
+    border-radius: 14px !important; padding: 0.8rem 1.5rem !important;
+    border: none !important; cursor: pointer !important;
+    transition: all 0.2s ease !important; width: 100% !important;
+}
+
 /* ═══ TOPBAR ════════════════════════════════════════════════════ */
-.topbar { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 2rem; background: rgba(5,8,16,0.92); border-bottom: 1px solid rgba(255,255,255,0.07); backdrop-filter: blur(12px); flex-shrink: 0; z-index: 100; position: sticky; top: 0; }
+.topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.75rem 2rem;
+    background: rgba(5,8,16,0.92);
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    backdrop-filter: blur(12px);
+    flex-shrink: 0; z-index: 100;
+    position: sticky; top: 0;
+}
 .topbar-left { display: flex; align-items: center; gap: 14px; }
-.topbar-title { font-size: 1rem; font-weight: 700; background: linear-gradient(90deg, #fff 0%, #a5b4fc 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: -0.01em; }
+.topbar-title {
+    font-size: 1rem; font-weight: 700;
+    background: linear-gradient(90deg, #fff 0%, #a5b4fc 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    letter-spacing: -0.01em;
+}
 .topbar-sub { font-size: 0.72rem; color: rgba(255,255,255,0.3); margin-top: 1px; }
 .topbar-right { display: flex; align-items: center; gap: 8px; }
-.status-dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 0 2px rgba(34,197,94,0.2), 0 0 8px rgba(34,197,94,0.4); animation: pulse-dot 2s ease-in-out infinite; flex-shrink: 0; }
-@keyframes pulse-dot { 0%,100% { box-shadow: 0 0 0 2px rgba(34,197,94,0.2), 0 0 8px rgba(34,197,94,0.4); } 50% { box-shadow: 0 0 0 4px rgba(34,197,94,0.1), 0 0 16px rgba(34,197,94,0.5); } }
-.topbar-user-email { font-size: 0.82rem; font-weight: 500; color: rgba(255,255,255,0.75); white-space: nowrap; }
+.status-dot {
+    width: 8px; height: 8px; border-radius: 50%; background: #22c55e;
+    box-shadow: 0 0 0 2px rgba(34,197,94,0.2), 0 0 8px rgba(34,197,94,0.4);
+    animation: pulse-dot 2s ease-in-out infinite; flex-shrink: 0;
+}
+@keyframes pulse-dot {
+    0%,100% { box-shadow: 0 0 0 2px rgba(34,197,94,0.2), 0 0 8px rgba(34,197,94,0.4); }
+    50%      { box-shadow: 0 0 0 4px rgba(34,197,94,0.1), 0 0 16px rgba(34,197,94,0.5); }
+}
+.topbar-user-email {
+    font-size: 0.82rem; font-weight: 500;
+    color: rgba(255,255,255,0.75);
+    white-space: nowrap;
+}
 
-/* ═══ WELCOME ═══════════════════════════════════════════════════ */
-.welcome-outer { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; min-height: calc(100vh - 80px); padding: 2rem; }
+/* ═══ WELCOME SCREEN ════════════════════════════════════════════ */
+.welcome-outer {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; min-height: calc(100vh - 80px); padding: 2rem;
+}
 .welcome-inner { max-width: 620px; width: 100%; }
-.welcome-orb { width: 64px; height: 64px; border-radius: 20px; margin: 0 auto 1.2rem; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #ec4899 100%); display: flex; align-items: center; justify-content: center; font-size: 1.8rem; box-shadow: 0 16px 48px rgba(99,102,241,0.4); animation: glow-orb 3s ease-in-out infinite; }
-@keyframes glow-orb { 0%,100% { box-shadow: 0 16px 48px rgba(99,102,241,0.4); } 50% { box-shadow: 0 20px 64px rgba(139,92,246,0.6); } }
-.welcome-title { font-size: 1.9rem; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 0.5rem; background: linear-gradient(135deg, #fff 0%, #a5b4fc 60%, #ec4899 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; line-height: 1.2; }
-.welcome-sub { font-size: 0.88rem; color: rgba(255,255,255,0.4); line-height: 1.6; margin-bottom: 1.8rem; font-weight: 300; }
+.welcome-orb {
+    width: 64px; height: 64px; border-radius: 20px; margin: 0 auto 1.2rem;
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #ec4899 100%);
+    display: flex; align-items: center; justify-content: center; font-size: 1.8rem;
+    box-shadow: 0 16px 48px rgba(99,102,241,0.4), 0 0 0 1px rgba(99,102,241,0.3);
+    animation: glow-orb 3s ease-in-out infinite;
+}
+@keyframes glow-orb {
+    0%,100% { box-shadow: 0 16px 48px rgba(99,102,241,0.4), 0 0 0 1px rgba(99,102,241,0.3); }
+    50%      { box-shadow: 0 20px 64px rgba(139,92,246,0.6), 0 0 0 1px rgba(139,92,246,0.4); }
+}
+.welcome-title {
+    font-size: 1.9rem; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 0.5rem;
+    background: linear-gradient(135deg, #fff 0%, #a5b4fc 60%, #ec4899 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; line-height: 1.2;
+}
+.welcome-sub {
+    font-size: 0.88rem; color: rgba(255,255,255,0.4);
+    line-height: 1.6; margin-bottom: 1.8rem; font-weight: 300;
+}
 .starter-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
-.starter-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 12px; padding: 12px 14px; text-align: left; cursor: pointer; transition: all 0.2s ease; }
+.starter-card {
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 12px; padding: 12px 14px; text-align: left;
+    cursor: pointer; transition: all 0.2s ease;
+}
 .starter-card:hover { background: rgba(99,102,241,0.08); border-color: rgba(99,102,241,0.25); transform: translateY(-1px); }
 .starter-icon { font-size: 1rem; margin-bottom: 4px; }
 .starter-text { font-size: 0.74rem; color: rgba(255,255,255,0.5); line-height: 1.4; }
 
-/* ═══ CHAT ══════════════════════════════════════════════════════ */
-[data-testid="stChatMessage"] { background: transparent !important; border: none !important; padding: 0.4rem 2rem !important; max-width: 860px !important; margin: 0 auto !important; }
-[data-testid="stChatMessageContent"] { border-radius: 18px !important; font-size: 0.9rem !important; line-height: 1.65 !important; }
+/* ═══ CHAT MESSAGES ═════════════════════════════════════════════ */
+[data-testid="stChatMessage"] {
+    background: transparent !important; border: none !important;
+    padding: 0.4rem 2rem !important; max-width: 860px !important; margin: 0 auto !important;
+}
+[data-testid="stChatMessageContent"] {
+    border-radius: 18px !important; font-size: 0.9rem !important; line-height: 1.65 !important;
+}
 [data-testid="chatAvatarIcon-user"]      { background: linear-gradient(135deg, #6366f1, #8b5cf6) !important; color: white !important; }
 [data-testid="chatAvatarIcon-assistant"] { background: linear-gradient(135deg, #0ea5e9, #6366f1) !important; color: white !important; }
-[data-testid="stChatInput"] { background: rgba(255,255,255,0.04) !important; border: 1px solid rgba(255,255,255,0.10) !important; border-radius: 18px !important; backdrop-filter: blur(10px) !important; max-width: 860px !important; margin: 0 auto !important; }
-[data-testid="stChatInput"]:focus-within { border-color: rgba(99,102,241,0.5) !important; box-shadow: 0 0 0 3px rgba(99,102,241,0.10) !important; }
-[data-testid="stChatInput"] textarea { color: white !important; font-family: 'Outfit', sans-serif !important; font-size: 0.88rem !important; }
+
+/* ═══ CHAT INPUT ══════════════════════════════════════════════════ */
+[data-testid="stChatInput"] {
+    background: rgba(255,255,255,0.04) !important;
+    border: 1px solid rgba(255,255,255,0.10) !important;
+    border-radius: 18px !important;
+    backdrop-filter: blur(10px) !important;
+    max-width: 860px !important;
+    margin: 0 auto !important;
+}
+[data-testid="stChatInput"]:focus-within {
+    border-color: rgba(99,102,241,0.5) !important;
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.10) !important;
+}
+[data-testid="stChatInput"] textarea {
+    color: white !important;
+    font-family: 'Outfit', sans-serif !important;
+    font-size: 0.88rem !important;
+}
 [data-testid="stChatInput"] textarea::placeholder { color: rgba(255,255,255,0.25) !important; }
 .stSpinner { color: #6366f1 !important; }
 hr { border-color: rgba(255,255,255,0.06) !important; }
+
+/* Auto-scroll anchor */
 #chat-bottom { height: 1px; }
 </style>
 
+<!-- Auto-scroll to bottom on new message -->
 <script>
 function scrollToBottom() {
-    var el = document.getElementById('chat-bottom');
-    if (el) el.scrollIntoView({ behavior: 'smooth' });
-    else window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    const anchor = document.getElementById('chat-bottom');
+    if (anchor) {
+        anchor.scrollIntoView({ behavior: 'smooth' });
+    } else {
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    }
 }
-new MutationObserver(scrollToBottom).observe(document.body, { childList: true, subtree: true });
+// Run on load and observe DOM changes
+const observer = new MutationObserver(() => scrollToBottom());
+observer.observe(document.body, { childList: true, subtree: true });
 window.addEventListener('load', scrollToBottom);
 </script>
 """, unsafe_allow_html=True)
@@ -483,6 +681,7 @@ def db_delete(session_id: str):
     _sf_exec("DELETE FROM chat_sessions WHERE id = %s", (session_id,))
 
 def db_delete_all_sessions(user_id: str):
+    """Delete ALL chat sessions and messages for a user."""
     rows = _sf_fetch("SELECT id FROM chat_sessions WHERE user_id = %s", (user_id,))
     for row in rows:
         _sf_exec("DELETE FROM chat_messages WHERE session_id = %s", (row[0],))
@@ -497,6 +696,10 @@ def db_log_document(filename: str, uploaded_by: str, chunk_count: int):
 # ─────────────────────────────────────────────────────────────────
 #  AI & PDF SEARCH
 # ─────────────────────────────────────────────────────────────────
+@st.cache_resource
+def supabase_client():
+    return create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+
 @st.cache_resource(show_spinner=False)
 def embedder():
     return SentenceTransformer(EMBED_MODEL)
@@ -522,23 +725,26 @@ def build_index():
     pdfs = list(folder.glob("*.pdf"))
     if not pdfs:
         return None, [], []
+
     chunks, meta = [], []
     for p in pdfs:
         for c in chunk_text(pdf_text(str(p))):
             chunks.append(c)
             meta.append(p.name)
+
     embs = em.encode(chunks, batch_size=64, show_progress_bar=False).astype("float32")
     faiss.normalize_L2(embs)
     idx = faiss.IndexFlatIP(embs.shape[1])
     idx.add(embs)
     return idx, chunks, meta
 
-def search(query: str, idx, chunks) -> tuple:
+def search(query: str, idx, chunks) -> tuple[str, bool]:
     if not idx:
         return "", False
     q = embedder().encode([query]).astype("float32")
     faiss.normalize_L2(q)
     scores, ids = idx.search(q, TOP_K)
+
     SCORE_THRESHOLD = 0.30
     relevant = [
         chunks[i]
@@ -560,6 +766,7 @@ def ask_groq(messages: list, system: str) -> str:
     return resp.choices[0].message.content
 
 def ask_groq_smalltalk(prompt: str) -> str:
+    """Dedicated call for small talk — no document context needed."""
     resp = Groq(api_key=GROQ_API_KEY).chat.completions.create(
         model    = GROQ_MODEL,
         messages = [
@@ -572,149 +779,118 @@ def ask_groq_smalltalk(prompt: str) -> str:
     return resp.choices[0].message.content
 
 # ─────────────────────────────────────────────────────────────────
-#  LOGIN PAGE  (shown when not authenticated)
+#  SESSION INIT
+# ─────────────────────────────────────────────────────────────────
+for k, v in {
+    "user_id": None, "user_email": None, "user_name": None,
+    "chat_sid": None, "chat_msgs": [],
+    "logged_out": False,   # FIX: track explicit logout
+}.items():
+    if k not in st.session_state:
+        st.session_state[k] = v
+
+# ─────────────────────────────────────────────────────────────────
+#  OAUTH CALLBACK — only process if not logged out
+# ─────────────────────────────────────────────────────────────────
+if "code" in st.query_params and not st.session_state.user_id and not st.session_state.logged_out:
+    try:
+        sess = supabase_client().auth.exchange_code_for_session({"auth_code": st.query_params["code"]})
+        user = sess.user
+        if ALLOWED_DOMAIN and not user.email.endswith(f"@{ALLOWED_DOMAIN}"):
+            st.error(f"Access restricted to @{ALLOWED_DOMAIN} accounts.")
+            st.stop()
+        st.session_state.user_id    = user.id
+        st.session_state.user_email = user.email
+        st.session_state.user_name  = user.user_metadata.get("full_name", user.email.split("@")[0])
+        st.session_state.logged_out = False
+        db_upsert_user(user.id, user.email, st.session_state.user_name)
+        st.query_params.clear()
+        st.rerun()
+    except Exception as e:
+        st.error(f"Auth error: {e}")
+
+# ─────────────────────────────────────────────────────────────────
+#  1. LOGIN PAGE
 # ─────────────────────────────────────────────────────────────────
 if not st.session_state.user_id:
+    # If there's an OAuth code in URL but user already logged out, clear it
+    if "code" in st.query_params and st.session_state.logged_out:
+        st.query_params.clear()
+
+    st.markdown('<div class="login-bg"></div>', unsafe_allow_html=True)
+    st.markdown('<div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div>', unsafe_allow_html=True)
+
     b64 = logo_b64(LOGO_PATH)
-    logo_html = f'<img src="{b64}" height="36">' if b64 else f'<span style="font-size:1.2rem;font-weight:800;color:white;">{COMPANY_NAME}</span>'
+    if b64:
+        st.markdown(f'<div class="login-top-bar"><img src="{b64}" height="36" style="display:block;"></div>', unsafe_allow_html=True)
 
-    st.markdown(f"""
-    <div class="login-bg">
-        <div class="orb orb-1"></div>
-        <div class="orb orb-2"></div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    col_l, col_c, col_r = st.columns([1, 2, 1])
-    with col_c:
-        st.markdown(f"""
+    _, col, _ = st.columns([1, 1.2, 1])
+    with col:
+        st.markdown("""
         <div class="login-card-html">
-            <div class="login-badge">🔒 Secure Enterprise Access</div>
-            <div class="login-title">Techwish AI</div>
+            <div class="login-badge">🔐 &nbsp;Secure Workspace</div>
+            <div class="login-title">Your Intelligent<br>Knowledge Hub</div>
             <div class="login-sub">
-                Your intelligent knowledge assistant.<br>
-                Sign in with your Techwish Google account to continue.
+                Ask anything. Get instant, precise answers<br>
+                drawn directly from your organization's documents.
             </div>
-            <div style="height:1px;background:rgba(255,255,255,0.07);margin-bottom:0;"></div>
-            <div class="feature-row">
-                <div class="feature-chip"><div class="ficon">📚</div>Document Q&A</div>
-                <div class="feature-chip"><div class="ficon">🔍</div>Smart Search</div>
-                <div class="feature-chip"><div class="ficon">🔒</div>@techwish.com only</div>
-            </div>
+            <div class="login-divider-line"></div>
         </div>
         """, unsafe_allow_html=True)
 
         st.markdown('<div class="login-btn-wrap">', unsafe_allow_html=True)
         if st.button("🔑  Continue with Google", type="primary", use_container_width=True):
+            # FIX: sign out from Supabase first to force Google re-auth
             try:
                 supabase_client().auth.sign_out()
             except Exception:
                 pass
+            st.session_state.logged_out = False
             res = supabase_client().auth.sign_in_with_oauth({
                 "provider": "google",
                 "options": {
                     "redirect_to": APP_URL,
                     "scopes": "email profile",
-                    "query_params": {"prompt": "select_account"},
-                    "flow_type": "implicit",   # ← fixes PKCE code_verifier mismatch
-                    "skip_browser_redirect": True,
+                    "query_params": {"prompt": "select_account"}  # forces Google account picker
                 }
             })
-            if res and res.url:
-                # ── IFRAME BREAKOUT + HASH EXTRACTOR ─────────────────────────
-                # 1. window.top breaks out of Streamlit Cloud's iframe
-                # 2. After Google redirects back, the access_token is in the
-                #    URL hash (#access_token=...). A second JS snippet reads
-                #    the hash and forwards it as ?access_token= so Streamlit
-                #    (which can't read hashes) can process it.
-                import streamlit.components.v1 as components
-                components.html(f"""
-                    <html>
-                    <head>
-                    <script>
-                    // ── Part 1: If we have a hash with access_token,
-                    //    convert it to query params for Streamlit to read
-                    (function() {{
-                        var hash = window.location.hash;
-                        if (hash && hash.indexOf("access_token") !== -1) {{
-                            var params = hash.replace("#", "");
-                            var obj = {{}};
-                            params.split("&").forEach(function(p) {{
-                                var kv = p.split("=");
-                                obj[kv[0]] = decodeURIComponent(kv[1] || "");
-                            }});
-                            // Redirect to app with access_token as query param
-                            var base = window.location.origin + window.location.pathname;
-                            var newUrl = base + "?access_token=" + encodeURIComponent(obj.access_token)
-                                       + "&refresh_token=" + encodeURIComponent(obj.refresh_token || "");
-                            try {{ window.top.location.href = newUrl; }}
-                            catch(e) {{ window.location.href = newUrl; }}
-                            return;
-                        }}
-
-                        // ── Part 2: No hash yet, redirect to Google login
-                        try {{
-                            window.top.location.href = "{res.url}";
-                        }} catch(e) {{
-                            window.location.href = "{res.url}";
-                        }}
-                    }})();
-                    </script>
-                    </head>
-                    <body style="margin:0;background:transparent;">
-                    <p style="font-family:sans-serif;font-size:13px;color:#888;
-                               text-align:center;padding-top:10px;">
-                        Redirecting to Google login…<br>
-                        <a href="{res.url}" target="_top"
-                           style="color:#a5b4fc;text-decoration:none;font-weight:600;">
-                           ↗ Click here if not redirected automatically
-                        </a>
-                    </p>
-                    </body>
-                    </html>
-                """, height=60)
-            else:
-                st.error("Could not generate login URL. Please check your Supabase configuration.")
+            st.markdown(f'<meta http-equiv="refresh" content="0; url={res.url}">', unsafe_allow_html=True)
+            st.markdown(f'<script>window.location.replace("{res.url}");</script>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
         st.markdown("""
         <div class="login-card-bottom">
-            <p style="font-size:0.68rem;color:rgba(255,255,255,0.2);text-align:center;margin:0;">
-                Restricted to @techwish.com accounts &nbsp;·&nbsp; Powered by Supabase Auth
-            </p>
+            <div class="feature-row">
+                <div class="feature-chip"><div class="ficon">📄</div>PDF-powered</div>
+                <div class="feature-chip"><div class="ficon">⚡</div>Instant answers</div>
+                <div class="feature-chip"><div class="ficon">🔒</div>@techwish.com only</div>
+            </div>
         </div>
         """, unsafe_allow_html=True)
 
     st.stop()
 
 # ─────────────────────────────────────────────────────────────────
-#  AUTHENTICATED — ensure user is in DB
-# ─────────────────────────────────────────────────────────────────
-db_upsert_user(
-    st.session_state.user_id,
-    st.session_state.user_email,
-    st.session_state.user_name or "",
-)
-
-# ─────────────────────────────────────────────────────────────────
-#  BUILD DOCUMENT INDEX
+#  2. BUILD INDEX
 # ─────────────────────────────────────────────────────────────────
 doc_idx, doc_chunks, doc_meta = build_index()
 
 # ─────────────────────────────────────────────────────────────────
-#  SIDEBAR
+#  3. SIDEBAR — collapsible/expandable, with logo, history, actions
 # ─────────────────────────────────────────────────────────────────
-name     = st.session_state.user_name  or ""
-email    = st.session_state.user_email or ""
+name     = st.session_state.user_name
+email    = st.session_state.user_email
 initials = "".join(w[0].upper() for w in name.split()[:2]) if name else "?"
 
 with st.sidebar:
     b64 = logo_b64(LOGO_PATH)
-    logo_html_sb = (
-        f'<div class="sb-logo-wrap"><img src="{b64}" height="30"></div>'
-        if b64 else
-        f'<div class="sb-logo-wrap"><span class="sb-logo-text">{COMPANY_NAME}</span></div>'
-    )
+
+    # ── Header: Logo + tagline ────────────────────────────────────
+    if b64:
+        logo_html_sb = f'<div class="sb-logo-wrap"><img src="{b64}" height="30"></div>'
+    else:
+        logo_html_sb = f'<div class="sb-logo-wrap"><span class="sb-logo-text">{COMPANY_NAME}</span></div>'
+
     st.markdown(f"""
     <div class="sb-header">
         {logo_html_sb}
@@ -722,6 +898,7 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
+    # ── User pill ─────────────────────────────────────────────────
     st.markdown(f"""
     <div class="user-pill" style="margin-top:0.9rem;">
         <div class="user-avatar">{initials}</div>
@@ -732,6 +909,7 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
+    # ── New Conversation ──────────────────────────────────────────
     st.markdown('<div class="new-chat-btn" style="padding:0 1.2rem 0.6rem;">', unsafe_allow_html=True)
     if st.button("✦  New Conversation", use_container_width=True):
         st.session_state.chat_sid  = None
@@ -739,19 +917,28 @@ with st.sidebar:
         st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
+    # ── PDF count badge ───────────────────────────────────────────
     pdf_count = len(list(Path(DOCS_FOLDER).glob("*.pdf"))) if Path(DOCS_FOLDER).exists() else 0
-    badge_html = (
-        f'<p style="font-size:0.68rem;color:rgba(255,255,255,0.28);margin:0 0 0.2rem;text-align:center;padding:0 1.2rem;">📚 {pdf_count} document{"s" if pdf_count != 1 else ""} loaded</p>'
-        if pdf_count else
-        '<p style="font-size:0.68rem;color:rgba(236,72,153,0.55);margin:0 0 0.2rem;text-align:center;padding:0 1.2rem;">⚠️ No PDFs in docs/ folder</p>'
-    )
-    st.markdown(badge_html, unsafe_allow_html=True)
+    if pdf_count:
+        st.markdown(
+            f'<p style="font-size:0.68rem;color:rgba(255,255,255,0.28);margin:0 0 0.2rem;text-align:center;padding:0 1.2rem;">📚 {pdf_count} document{"s" if pdf_count != 1 else ""} loaded</p>',
+            unsafe_allow_html=True
+        )
+    else:
+        st.markdown(
+            '<p style="font-size:0.68rem;color:rgba(236,72,153,0.55);margin:0 0 0.2rem;text-align:center;padding:0 1.2rem;">⚠️ No PDFs in docs/ folder</p>',
+            unsafe_allow_html=True
+        )
 
+    # ── Chat History ──────────────────────────────────────────────
     st.markdown('<div class="sb-section">', unsafe_allow_html=True)
     st.markdown('<div class="sb-section-label">Chat History</div>', unsafe_allow_html=True)
     sessions = db_sessions(st.session_state.user_id)
     if not sessions:
-        st.markdown('<p style="font-size:0.75rem;color:rgba(255,255,255,0.22);padding:0.2rem 0 0.4rem;">No conversations yet.</p>', unsafe_allow_html=True)
+        st.markdown(
+            '<p style="font-size:0.75rem;color:rgba(255,255,255,0.22);padding:0.2rem 0 0.4rem;">No conversations yet.</p>',
+            unsafe_allow_html=True
+        )
     st.markdown('</div>', unsafe_allow_html=True)
 
     for s in sessions:
@@ -770,7 +957,9 @@ with st.sidebar:
                     st.session_state.chat_msgs = []
                 st.rerun()
 
+    # ── Bottom actions: Clear Chat + Sign Out ─────────────────────
     st.markdown('<div class="sb-bottom">', unsafe_allow_html=True)
+
     st.markdown('<div class="clear-btn">', unsafe_allow_html=True)
     if st.button("🗑️  Clear Chat", use_container_width=True):
         db_delete_all_sessions(st.session_state.user_id)
@@ -787,6 +976,7 @@ with st.sidebar:
             pass
         for key in list(st.session_state.keys()):
             del st.session_state[key]
+        st.session_state.logged_out = True
         st.session_state.user_id    = None
         st.session_state.user_email = None
         st.session_state.user_name  = None
@@ -795,17 +985,15 @@ with st.sidebar:
         st.query_params.clear()
         st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown('</div>', unsafe_allow_html=True)  # close sb-bottom
 
 # ─────────────────────────────────────────────────────────────────
-#  TOPBAR
+#  4. TOPBAR — green dot + name only (removed "Online" label)
 # ─────────────────────────────────────────────────────────────────
 b64_top   = logo_b64(LOGO_PATH)
-logo_html = (
-    f'<img src="{b64_top}" height="30" style="display:block;">'
-    if b64_top else
-    f'<span style="font-weight:800;">{COMPANY_NAME}</span>'
-)
+logo_html = f'<img src="{b64_top}" height="30" style="display:block;">' if b64_top else f'<span style="font-weight:800;">{COMPANY_NAME}</span>'
+
 st.markdown(f"""
 <div class="topbar">
     <div class="topbar-left">
@@ -823,7 +1011,7 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────────────────────────
-#  SYSTEM PROMPT
+#  5. SYSTEM PROMPT (document questions only)
 # ─────────────────────────────────────────────────────────────────
 SYSTEM_PROMPT = """You are the Techwish AI Knowledge Assistant.
 You ONLY answer using the Context provided below. This is a strict rule with no exceptions.
@@ -839,7 +1027,7 @@ Context:
 {context}"""
 
 # ─────────────────────────────────────────────────────────────────
-#  CHAT AREA
+#  6. CHAT AREA
 # ─────────────────────────────────────────────────────────────────
 if not st.session_state.chat_msgs:
     st.markdown("""
@@ -865,6 +1053,7 @@ for m in st.session_state.chat_msgs:
     with st.chat_message(m["role"]):
         st.markdown(m["content"])
 
+# Scroll anchor — always rendered at the bottom of the chat
 st.markdown('<div id="chat-bottom"></div>', unsafe_allow_html=True)
 
 if prompt := st.chat_input("Ask anything about your documents…"):
@@ -880,9 +1069,11 @@ if prompt := st.chat_input("Ask anything about your documents…"):
 
     with st.chat_message("assistant"):
         with st.spinner("Thinking…"):
+            # ── Small talk / greeting path ────────────────────────
             if is_small_talk(prompt):
                 answer = ask_groq_smalltalk(prompt)
             else:
+                # ── Document RAG path ─────────────────────────────
                 context, has_context = search(prompt, doc_idx, doc_chunks)
                 if not has_context:
                     answer = NO_CONTEXT_MSG
@@ -894,6 +1085,7 @@ if prompt := st.chat_input("Ask anything about your documents…"):
         st.session_state.chat_msgs.append({"role": "assistant", "content": answer})
         db_save(st.session_state.chat_sid, "assistant", answer)
 
+    # Auto-scroll: inject JS to scroll to bottom after new message
     st.markdown(
         '<script>document.getElementById("chat-bottom")?.scrollIntoView({behavior:"smooth"});</script>',
         unsafe_allow_html=True
