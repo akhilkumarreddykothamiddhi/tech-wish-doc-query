@@ -698,14 +698,19 @@ def api_chat():
     db_save_msg(sid, "assistant", answer)
     return jsonify({"answer": answer, "session_id": sid})
 
+# ─────────────────────────────────────────────────────────────────
+#  STARTUP (Move this OUTSIDE the if block)
+# ─────────────────────────────────────────────────────────────────
 
-# ─────────────────────────────────────────────────────────────────
-#  STARTUP
-# ─────────────────────────────────────────────────────────────────
-if __name__ == "__main__":
-    logging.warning("[STARTUP] Building document index…")
+# This ensures it runs even when started by Gunicorn
+logging.warning("[STARTUP] Building document index...")
+try:
     build_index()
-    logging.warning("[STARTUP] Starting TechWish DocQuery Flask server…")
+except Exception as e:
+    logging.error("[STARTUP] Failed to build index: %s", e)
+
+if __name__ == "__main__":
+    logging.warning("[STARTUP] Starting TechWish DocQuery Flask server...")
     app.run(
         host="0.0.0.0",
         port=int(os.environ.get("PORT", 5000)),
