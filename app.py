@@ -339,9 +339,6 @@ def send_reset_otp_email(to_email, otp):
 #  AI / DOCUMENT INDEX  (fastembed — pure ONNX, no PyTorch)
 # ─────────────────────────────────────────────────────────────────
 # ─────────────────────────────────────────────────────────────────
-#  LIGHTWEIGHT DOCUMENT SEARCH (RAM FRIENDLY)
-# ─────────────────────────────────────────────────────────────────
-# ─────────────────────────────────────────────────────────────────
 #  LIGHTWEIGHT DOCUMENT SEARCH (FIXED)
 # ─────────────────────────────────────────────────────────────────
 _cached_text = ""
@@ -351,39 +348,43 @@ def get_all_doc_text():
     if _cached_text:
         return _cached_text
     
-    # Try multiple ways to find the docs folder
-    possible_paths = [
-        Path(os.getcwd()) / "docs",
-        Path(__file__).parent / "docs",
-        Path("/opt/render/project/src/docs") # Explicit Render path
-    ]
+    # Render's project root is /opt/render/project/src/
+    # We check the local 'docs' folder relative to this file
+    base_path = Path(__file__).parent
+    folder = base_path / "docs"
     
-    folder = None
-    for p in possible_paths:
-        if p.exists() and p.is_dir():
-            folder = p
-            break
-
-    if not folder:
-        # This will show up in your Render Logs to tell us exactly where it looked
-        logging.warning(f"[INDEX] CRITICAL: Docs folder not found. Looked in: {[str(p) for p in possible_paths]}")
+    if not folder.exists():
+        logging.warning(f"[INDEX] Docs folder not found at {folder}")
         return ""
 
     pdfs = list(folder.glob("*.pdf"))
-    logging.warning(f"[INDEX] Found {len(pdfs)} PDFs in {folder}")
+    if not pdfs:
+        logging.warning(f"[INDEX] No PDF files found in {folder}")
+        return ""
 
-    extracted_text = ""
+    text_parts = []
     for p in pdfs:
         try:
-            doc = fitz.open(str(p))
-            for page in doc:
-                extracted_text += page.get_text()
-            doc.close()
+            logging.warning(f"[INDEX] Reading: {p.name}")
+            with fitz.open(str(p)) as doc:
+                for page in doc:
+                    # 'text' is much lighter than other extraction modes
+                    text_parts.append(page.get_text("text"))
         except Exception as e:
-            logging.error(f"[INDEX] Error reading {p.name}: {e}")
+            logging.error(f"[INDEX] Could not read {p.name}: {e}")
             
-    _cached_text = extracted_text[:18000]
+    # Combine and trim to 12,000 characters to keep Groq happy and RAM low
+    full_text = " ".join(text_parts)
+    _cached_text = " ".join(full_text.split())[:12000] 
+    
+    logging.warning(f"[INDEX] Loaded {len(_cached_text)} chars from {len(pdfs)} files.")
     return _cached_text
+
+def doc_search(query):
+    context = get_all_doc_text()
+    if not context or len(context) < 20:
+        return "", False
+    return context, True
 SMALL_TALK_KEYWORDS = [
     "hi","hello","hey","hru","how are you","good morning","good afternoon",
     "good evening","good night","what's up","whats up","sup","howdy","greetings",
