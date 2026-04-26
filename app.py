@@ -341,6 +341,9 @@ def send_reset_otp_email(to_email, otp):
 # ─────────────────────────────────────────────────────────────────
 #  LIGHTWEIGHT DOCUMENT SEARCH (RAM FRIENDLY)
 # ─────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────
+#  LIGHTWEIGHT DOCUMENT SEARCH (FIXED)
+# ─────────────────────────────────────────────────────────────────
 _cached_text = ""
 
 def get_all_doc_text():
@@ -348,32 +351,41 @@ def get_all_doc_text():
     if _cached_text:
         return _cached_text
     
+    # Path logic for Render
     folder = Path(DOCS_FOLDER)
+    if not folder.exists():
+        logging.warning(f"[INDEX] Folder not found: {folder.absolute()}")
+        return ""
+
     pdfs = list(folder.glob("*.pdf"))
     if not pdfs:
+        logging.warning(f"[INDEX] No PDFs found in: {folder.absolute()}")
         return ""
     
     extracted_text = ""
     for p in pdfs:
         try:
+            logging.warning(f"[INDEX] Reading: {p.name}")
             doc = fitz.open(str(p))
             for page in doc:
                 extracted_text += page.get_text()
             doc.close()
         except Exception as e:
-            logging.error(f"Error reading {p}: {e}")
+            logging.error(f"[INDEX] Error reading {p.name}: {e}")
             
-    _cached_text = extracted_text[:15000] # Limit to ~15k characters to stay safe
+    # Clean up the text: remove excess whitespace
+    extracted_text = " ".join(extracted_text.split())
+    
+    # Limit characters for Groq Context (staying safe under RAM limits)
+    _cached_text = extracted_text[:18000] 
+    logging.warning(f"[INDEX] Success! Extracted {len(_cached_text)} characters.")
     return _cached_text
 
 def doc_search(query):
-    # Instead of vector search, we send the whole text as context
-    # Groq Llama 3 can handle this easily
     context = get_all_doc_text()
-    if not context:
+    if not context or len(context.strip()) < 10:
         return "", False
     return context, True
-
 SMALL_TALK_KEYWORDS = [
     "hi","hello","hey","hru","how are you","good morning","good afternoon",
     "good evening","good night","what's up","whats up","sup","howdy","greetings",
