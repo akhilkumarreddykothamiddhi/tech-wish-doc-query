@@ -351,21 +351,30 @@ def get_all_doc_text():
     if _cached_text:
         return _cached_text
     
-    # Path logic for Render
-    folder = Path(DOCS_FOLDER)
-    if not folder.exists():
-        logging.warning(f"[INDEX] Folder not found: {folder.absolute()}")
+    # Try multiple ways to find the docs folder
+    possible_paths = [
+        Path(os.getcwd()) / "docs",
+        Path(__file__).parent / "docs",
+        Path("/opt/render/project/src/docs") # Explicit Render path
+    ]
+    
+    folder = None
+    for p in possible_paths:
+        if p.exists() and p.is_dir():
+            folder = p
+            break
+
+    if not folder:
+        # This will show up in your Render Logs to tell us exactly where it looked
+        logging.warning(f"[INDEX] CRITICAL: Docs folder not found. Looked in: {[str(p) for p in possible_paths]}")
         return ""
 
     pdfs = list(folder.glob("*.pdf"))
-    if not pdfs:
-        logging.warning(f"[INDEX] No PDFs found in: {folder.absolute()}")
-        return ""
-    
+    logging.warning(f"[INDEX] Found {len(pdfs)} PDFs in {folder}")
+
     extracted_text = ""
     for p in pdfs:
         try:
-            logging.warning(f"[INDEX] Reading: {p.name}")
             doc = fitz.open(str(p))
             for page in doc:
                 extracted_text += page.get_text()
@@ -373,19 +382,8 @@ def get_all_doc_text():
         except Exception as e:
             logging.error(f"[INDEX] Error reading {p.name}: {e}")
             
-    # Clean up the text: remove excess whitespace
-    extracted_text = " ".join(extracted_text.split())
-    
-    # Limit characters for Groq Context (staying safe under RAM limits)
-    _cached_text = extracted_text[:18000] 
-    logging.warning(f"[INDEX] Success! Extracted {len(_cached_text)} characters.")
+    _cached_text = extracted_text[:18000]
     return _cached_text
-
-def doc_search(query):
-    context = get_all_doc_text()
-    if not context or len(context.strip()) < 10:
-        return "", False
-    return context, True
 SMALL_TALK_KEYWORDS = [
     "hi","hello","hey","hru","how are you","good morning","good afternoon",
     "good evening","good night","what's up","whats up","sup","howdy","greetings",
