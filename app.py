@@ -21,8 +21,8 @@ from flask import (
 )
 from groq import Groq
 import fitz                        # PyMuPDF
-from fastembed import TextEmbedding
-import numpy as np
+# from fastembed import TextEmbedding
+# import numpy as np
 import snowflake.connector
 import bcrypt as _bcrypt
 
