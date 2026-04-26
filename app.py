@@ -87,7 +87,12 @@ SMTP_SENDER_EMAIL = _optional("SMTP_SENDER_EMAIL")
 SMTP_APP_PASSWORD = _optional("SMTP_APP_PASSWORD")
 
 # ── Paths / model settings ─────────────────────────────────────────
-DOCS_FOLDER   = _optional("DOCS_FOLDER", "docs")
+# Change this line:
+# DOCS_FOLDER = _optional("DOCS_FOLDER", "docs")
+
+# To this:
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DOCS_FOLDER = os.path.join(BASE_DIR, _optional("DOCS_FOLDER", "docs"))
 GROQ_MODEL    = "llama-3.1-8b-instant"
 EMBED_MODEL   = "BAAI/bge-small-en-v1.5"
 CHUNK_SIZE    = 500
