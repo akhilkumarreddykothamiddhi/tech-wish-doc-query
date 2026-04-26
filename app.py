@@ -681,7 +681,7 @@ def api_chat():
             answer = NO_CONTEXT_MSG
         else:
             system = SYSTEM_PROMPT.format(context=context)
-            answer = ask_groq(history_for_groq[:-1], system)
+            answer = ask_groq(history_for_groq, system)
 
     db_save_msg(sid, "assistant", answer)
     return jsonify({"answer": answer, "session_id": sid})
