@@ -338,64 +338,41 @@ def send_reset_otp_email(to_email, otp):
 # ─────────────────────────────────────────────────────────────────
 #  AI / DOCUMENT INDEX  (fastembed — pure ONNX, no PyTorch)
 # ─────────────────────────────────────────────────────────────────
-_embedder   = None
-_doc_chunks = []
-_doc_embs   = None
+# ─────────────────────────────────────────────────────────────────
+#  LIGHTWEIGHT DOCUMENT SEARCH (RAM FRIENDLY)
+# ─────────────────────────────────────────────────────────────────
+_cached_text = ""
 
-def get_embedder():
-    global _embedder
-    if _embedder is None:
-        _embedder = TextEmbedding(model_name=EMBED_MODEL)
-    return _embedder
-
-def pdf_text(path):
-    doc   = fitz.open(path)
-    pages = [page.get_text() for page in doc]
-    doc.close()
-    return "\n".join(pages)
-
-def chunk_text(text):
-    out, i = [], 0
-    while i < len(text):
-        out.append(text[i: i + CHUNK_SIZE])
-        i += CHUNK_SIZE - CHUNK_OVERLAP
-    return out
-
-def _norm(v):
-    n = np.linalg.norm(v, axis=-1, keepdims=True)
-    n = np.where(n == 0, 1, n)
-    return v / n
-
-def build_index():
-    global _doc_embs, _doc_chunks
-    em     = get_embedder()
+def get_all_doc_text():
+    global _cached_text
+    if _cached_text:
+        return _cached_text
+    
     folder = Path(DOCS_FOLDER)
-    folder.mkdir(parents=True, exist_ok=True)
-    pdfs   = list(folder.glob("*.pdf"))
+    pdfs = list(folder.glob("*.pdf"))
     if not pdfs:
-        _doc_embs = None; _doc_chunks = []
-        logging.warning("[INDEX] No PDFs found in %s", DOCS_FOLDER)
-        return
-    chunks = []
+        return ""
+    
+    extracted_text = ""
     for p in pdfs:
-        for c in chunk_text(pdf_text(str(p))):
-            chunks.append(c)
-    embs = np.array(list(em.embed(chunks)), dtype="float32")
-    _doc_embs   = _norm(embs)
-    _doc_chunks = chunks
-    logging.warning("[INDEX] Built index with %d chunks from %d PDF(s)", len(chunks), len(pdfs))
+        try:
+            doc = fitz.open(str(p))
+            for page in doc:
+                extracted_text += page.get_text()
+            doc.close()
+        except Exception as e:
+            logging.error(f"Error reading {p}: {e}")
+            
+    _cached_text = extracted_text[:15000] # Limit to ~15k characters to stay safe
+    return _cached_text
 
 def doc_search(query):
-    if _doc_embs is None or len(_doc_chunks) == 0:
+    # Instead of vector search, we send the whole text as context
+    # Groq Llama 3 can handle this easily
+    context = get_all_doc_text()
+    if not context:
         return "", False
-    em = get_embedder()
-    q  = _norm(np.array(list(em.embed([query])), dtype="float32"))
-    scores  = (_doc_embs @ q.T).squeeze()
-    top_ids = np.argsort(scores)[::-1][:TOP_K]
-    relevant = [_doc_chunks[i] for i in top_ids if scores[i] >= 0.30]
-    if not relevant:
-        return "", False
-    return "\n\n---\n\n".join(relevant), True
+    return context, True
 
 SMALL_TALK_KEYWORDS = [
     "hi","hello","hey","hru","how are you","good morning","good afternoon",
@@ -702,15 +679,7 @@ def api_chat():
 #  STARTUP (Move this OUTSIDE the if block)
 # ─────────────────────────────────────────────────────────────────
 
-# This ensures it runs even when started by Gunicorn
-logging.warning("[STARTUP] Building document index...")
-try:
-    build_index()
-except Exception as e:
-    logging.error("[STARTUP] Failed to build index: %s", e)
-
 if __name__ == "__main__":
-    logging.warning("[STARTUP] Starting TechWish DocQuery Flask server...")
     app.run(
         host="0.0.0.0",
         port=int(os.environ.get("PORT", 5000)),
