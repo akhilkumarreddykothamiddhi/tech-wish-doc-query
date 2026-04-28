@@ -1,8 +1,9 @@
 flask
 gunicorn
-flask-cors
 groq
+fastembed
 PyMuPDF
+numpy
 snowflake-connector-python
 bcrypt
 python-dotenv
