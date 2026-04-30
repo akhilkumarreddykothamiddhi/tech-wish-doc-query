@@ -7,3 +7,4 @@ numpy
 snowflake-connector-python
 bcrypt
 python-dotenv
+sendgrid
