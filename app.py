@@ -148,8 +148,6 @@ def get_db():
             database=SNOWFLAKE_DATABASE,
             schema=SNOWFLAKE_SCHEMA,
             role=SNOWFLAKE_ROLE,
-            login_timeout=30,      # seconds to wait for login
-            network_timeout=30,    # seconds to wait for network ops
         )
         _ensure_tables(_db_conn)
     return _db_conn
@@ -157,47 +155,41 @@ def get_db():
 def _sf_exec(sql, params=()):
     """Execute a write statement, reconnecting once on stale-session errors."""
     global _db_conn
-    for attempt in range(2):
+    def _run(conn):
+        cur = conn.cursor()
         try:
-            conn = get_db()
-            cur = conn.cursor()
-            try:
-                cur.execute(sql, params)
-                conn.commit()
-            finally:
-                cur.close()
-            return  # success
-        except Exception as e:
-            err = str(e)
-            if any(x in err for x in ("390114", "390111", "Authentication token", "session")):
-                logging.warning("[DB] Stale session on exec (attempt %d), reconnecting…", attempt + 1)
-                _db_conn = None  # force new connection on next get_db()
-                if attempt == 1:
-                    raise  # second attempt also failed — give up
-            else:
-                raise  # non-session error — raise immediately
+            cur.execute(sql, params)
+            conn.commit()
+        finally:
+            cur.close()
+    try:
+        _run(get_db())
+    except Exception as e:
+        err = str(e)
+        if any(x in err for x in ("390114", "Authentication token", "session")):
+            _db_conn = None
+            _run(get_db())
+        else:
+            raise
 
 def _sf_fetch(sql, params=()):
     """Execute a read statement, reconnecting once on stale-session errors."""
     global _db_conn
-    for attempt in range(2):
+    def _run(conn):
+        cur = conn.cursor()
         try:
-            conn = get_db()
-            cur = conn.cursor()
-            try:
-                cur.execute(sql, params)
-                return cur.fetchall()
-            finally:
-                cur.close()
-        except Exception as e:
-            err = str(e)
-            if any(x in err for x in ("390114", "390111", "Authentication token", "session")):
-                logging.warning("[DB] Stale session on fetch (attempt %d), reconnecting…", attempt + 1)
-                _db_conn = None  # force new connection on next get_db()
-                if attempt == 1:
-                    raise  # second attempt also failed — give up
-            else:
-                raise  # non-session error — raise immediately
+            cur.execute(sql, params)
+            return cur.fetchall()
+        finally:
+            cur.close()
+    try:
+        return _run(get_db())
+    except Exception as e:
+        err = str(e)
+        if any(x in err for x in ("390114", "Authentication token", "session")):
+            _db_conn = None
+            return _run(get_db())
+        raise
 
 def _ensure_tables(conn):
     cur = conn.cursor()
