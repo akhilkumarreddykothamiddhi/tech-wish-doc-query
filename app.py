@@ -354,26 +354,34 @@ def db_delete_all_sessions(user_id):
     _sf_exec("DELETE FROM chat_sessions WHERE user_id=%s", (user_id,))
 
 # ─────────────────────────────────────────────────────────────────
-#  EMAIL
+#  EMAIL  — SendGrid (works on Render; no raw SMTP needed)
+#  Falls back to otp_dev.log if SENDGRID_API_KEY is not set.
 # ─────────────────────────────────────────────────────────────────
-def _smtp_send(sender, app_pass, mime_msg, to_email):
-    """Try SSL/465 first, then STARTTLS/587."""
+SENDGRID_API_KEY  = _optional("SENDGRID_API_KEY")
+SMTP_SENDER_EMAIL = _optional("SMTP_SENDER_EMAIL")   # keep as From address
+
+def _sendgrid_send(to_email: str, subject: str, html_body: str) -> bool:
+    """Send via SendGrid API. Returns True on success."""
     try:
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=15) as s:
-            s.login(sender, app_pass)
-            s.sendmail(sender, to_email, mime_msg.as_string())
-        return True
-    except Exception as e1:
-        logging.warning("SMTP port 465 failed (%s), trying 587…", e1)
-    try:
-        with smtplib.SMTP("smtp.gmail.com", 587, timeout=15) as s:
-            s.ehlo(); s.starttls(); s.ehlo()
-            s.login(sender, app_pass)
-            s.sendmail(sender, to_email, mime_msg.as_string())
-        return True
-    except Exception as e2:
-        logging.error("SMTP port 587 also failed: %s", e2)
+        import sendgrid as sg_lib
+        from sendgrid.helpers.mail import Mail
+
+        client = sg_lib.SendGridAPIClient(api_key=SENDGRID_API_KEY)
+        message = Mail(
+            from_email=SMTP_SENDER_EMAIL or "noreply@techwish.com",
+            to_emails=to_email,
+            subject=subject,
+            html_content=html_body,
+        )
+        resp = client.send(message)
+        if resp.status_code in (200, 202):
+            return True
+        logging.error("[EMAIL] SendGrid returned status %d", resp.status_code)
         return False
+    except Exception as e:
+        logging.error("[EMAIL] SendGrid error: %s", e)
+        return False
+
 
 def _otp_html(otp, headline):
     return f"""<html><body style="font-family:Arial,sans-serif;background:#f4f4f4;padding:32px;">
@@ -391,37 +399,41 @@ def _otp_html(otp, headline):
     </p>
   </div></body></html>"""
 
-def send_otp_email(to_email, otp, purpose):
-    sender   = SMTP_SENDER_EMAIL
-    app_pass = SMTP_APP_PASSWORD
-    if not sender or not app_pass:
+
+def send_otp_email(to_email: str, otp: str, purpose: str) -> bool:
+    if not SENDGRID_API_KEY or not SMTP_SENDER_EMAIL:
         _otp_logger.debug("OTP for %s (%s): %s", to_email, purpose, otp)
         return True
+
     action = (
-        "verify your new account"
-        if purpose == "register"
+        "verify your new account" if purpose == "register"
         else "sign in to your account"
     )
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = "TechWish DocQuery — Your Verification Code"
-    msg["From"]    = f"TechWish DocQuery <{sender}>"
-    msg["To"]      = to_email
-    msg.attach(
-        MIMEText(_otp_html(otp, f"Use the code below to {action}:"), "html")
-    )
-    ok = _smtp_send(sender, app_pass, msg, to_email)
+    subject   = "TechWish DocQuery — Your Verification Code"
+    html_body = _otp_html(otp, f"Use the code below to {action}:")
+
+    ok = _sendgrid_send(to_email, subject, html_body)
     if not ok:
         _otp_logger.debug(
             "EMAIL FAILED — OTP for %s (%s): %s", to_email, purpose, otp
         )
     return ok
 
-def send_reset_otp_email(to_email, otp):
-    sender   = SMTP_SENDER_EMAIL
-    app_pass = SMTP_APP_PASSWORD
-    if not sender or not app_pass:
+
+def send_reset_otp_email(to_email: str, otp: str) -> bool:
+    if not SENDGRID_API_KEY or not SMTP_SENDER_EMAIL:
         _otp_logger.debug("RESET OTP for %s: %s", to_email, otp)
         return True
+
+    subject   = "TechWish DocQuery — Password Reset Code"
+    html_body = _otp_html(otp, "Use the code below to reset your password:")
+
+    ok = _sendgrid_send(to_email, subject, html_body)
+    if not ok:
+        _otp_logger.debug(
+            "EMAIL FAILED — RESET OTP for %s: %s", to_email, otp
+        )
+    return ok
     msg = MIMEMultipart("alternative")
     msg["Subject"] = "TechWish DocQuery — Password Reset Code"
     msg["From"]    = f"TechWish DocQuery <{sender}>"
@@ -926,11 +938,13 @@ def api_resend_otp():
         return jsonify({"error": "Session expired. Please log in again."}), 400
     otp = generate_otp()
     db_save_otp(email, otp, purpose)
-    ok  = send_otp_email(email, otp, purpose)
+    ok = send_otp_email(email, otp, purpose)
+    # In dev mode (no API key), send_otp_email returns True after logging —
+    # so this always returns 200 in dev, and only 500 on a genuine API failure.
     if ok:
         return jsonify({"resent": True, "email": email})
     return jsonify({
-        "error": "Failed to send email. Check otp_dev.log on the server."
+        "error": "Failed to send email. Please contact support."
     }), 500
 
 
